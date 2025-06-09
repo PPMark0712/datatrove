@@ -4,7 +4,7 @@ from collections import Counter
 from datatrove.data import Document
 from datatrove.pipeline.filters.base_filter import BaseFilter
 from datatrove.pipeline.writers.disk_base import DiskWriter
-from datatrove.utils.text import split_into_words
+from datatrove.utils.text import split_into_words, preprocess_for_repetition
 from datatrove.utils.typeshelper import Languages
 
 
@@ -124,7 +124,9 @@ class GopherRepetitionFilter(BaseFilter):
         if self.dup_line_char_frac and char_duplicates / len(text) > self.dup_line_char_frac:
             return False, "dup_line_char_frac"
 
+        text = preprocess_for_repetition(text)
         words = split_into_words(text, self.language)
+        doc.metadata["words"] = words
 
         for n, n_frac in self.top_n_grams:
             n_grams = get_n_grams(words, n)

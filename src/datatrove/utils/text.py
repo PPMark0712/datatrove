@@ -315,3 +315,28 @@ def split_into_sentences(text, language=Languages.english):
 
 def split_into_paragraphs(text, language=Languages.english):
     return split_into_parts(text, mode=SPLIT_TEXT_PARAGRAPHS, language=language)
+
+
+def preprocess_for_repetition(text: str)->str:
+    text =  text.replace('|', ' ')
+    text =  text.replace('<br>', '\n')
+    text = re.sub(r'\d+\.\s+', '', text)
+    lines = text.splitlines()
+    processed_lines = [line.lstrip("+-*• ") for line in lines]
+    text = '\n'.join(processed_lines)
+    text = re.sub(r' +', ' ', text)
+    return text
+    
+
+def preprocess_for_alpha_word_ratio(text: str)->str:
+    text =  text.replace('|', ' ')
+    text =  text.replace('<br>', ' ')
+    text = re.sub(r'\d+\.\s+', '', text)
+    lines = text.splitlines()
+    processed_lines = [line.lstrip("+-*• ") for line in lines]
+    text = '\n'.join(processed_lines)
+    text = re.sub(r'\d+[\.\、\)）]\s+', '', text)
+    text = re.sub(r'[A-Ha-h][\.\、\)）]\s+', '', text)
+    text = re.sub(r'[\(\[\{（［【]\s*\d+\s*[\)\]\}）］】]', '', text)
+    text = re.sub(r'\s+', ' ', text)
+    return text

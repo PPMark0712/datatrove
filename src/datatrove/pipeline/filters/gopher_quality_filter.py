@@ -3,7 +3,7 @@ import numpy as np
 from datatrove.data import Document
 from datatrove.pipeline.filters.base_filter import BaseFilter
 from datatrove.pipeline.writers.disk_base import DiskWriter
-from datatrove.utils.text import PUNCTUATION_SET, split_into_words
+from datatrove.utils.text import PUNCTUATION_SET, split_into_words, preprocess_for_alpha_word_ratio
 from datatrove.utils.typeshelper import Languages
 
 
@@ -111,6 +111,7 @@ class GopherQualityFilter(BaseFilter):
             return False, "gopher_too_many_end_ellipsis"
 
         # that 80 % of words in a document contain at least one alphabetic character
+        words = split_into_words(preprocess_for_alpha_word_ratio(text), self.language)
         if (
             self.max_non_alpha_words_ratio
             # nb of words with at least 1 alpha char < 0.8
