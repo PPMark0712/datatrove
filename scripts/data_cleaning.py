@@ -91,16 +91,17 @@ def main():
                 JsonlReader(
                     os.path.join(LANGUAGE_FILTER_OUTPUT_PATH, language)
                 ),
-                # GopherRepetitionFilter(
-                #     top_n_grams=((2, 0.3), (3, 0.27), (4, 0.25)),
-                #     exclusion_writer=JsonlWriter(
-                #         os.path.join(QUALITY_FILTERING_REMOVE_PATH, "1_gopher_repetition_filter"),
-                #         output_filename="${filter_reason}/${rank}.jsonl",
-                #         compression=None
-                #     )
-                # ),
+                GopherRepetitionFilter(
+                    language=language,
+                    dup_n_grams=((5, 0.20), (6, 0.18), (7, 0.16), (8, 0.145), (9, 0.13), (10, 0.12)),
+                    exclusion_writer=JsonlWriter(
+                        os.path.join(QUALITY_FILTERING_REMOVE_PATH, "1_gopher_repetition_filter"),
+                        output_filename="${filter_reason}/${rank}.jsonl",
+                        compression=None
+                    )
+                ),
                 GopherQualityFilter(
-                    min_doc_word=30,
+                    language=language,
                     min_stop_words=None,
                     max_non_alpha_words_ratio=None,
                     min_avg_word_length=None,
@@ -111,15 +112,8 @@ def main():
                         compression=None
                     )
                 ),
-                C4QualityFilter(
-                    filter_no_terminal_punct=False,
-                    exclusion_writer=JsonlWriter(
-                        os.path.join(QUALITY_FILTERING_REMOVE_PATH, "3_c4_quality_filter"),
-                        output_filename="${filter_reason}/${rank}.jsonl",
-                        compression=None
-                    )
-                ),
                 FineWebQualityFilter(
+                    language=language,
                     exclusion_writer=JsonlWriter(
                         os.path.join(QUALITY_FILTERING_REMOVE_PATH, "4_fineweb_quality_filter"),
                         output_filename="${filter_reason}/${rank}.jsonl",

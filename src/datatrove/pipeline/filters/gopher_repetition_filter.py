@@ -126,7 +126,6 @@ class GopherRepetitionFilter(BaseFilter):
 
         text = preprocess_for_repetition(text)
         words = split_into_words(text, self.language)
-        doc.metadata["words"] = words
 
         for n, n_frac in self.top_n_grams:
             n_grams = get_n_grams(words, n)
@@ -134,11 +133,11 @@ class GopherRepetitionFilter(BaseFilter):
                 continue
             top_char_length = find_top_duplicate(n_grams)
             if top_char_length / len(text) > n_frac:
-                return False, f"top_{n}_gram"
+                return False, f"top_n_gram"
 
         for n, n_frac in self.dup_n_grams:
             n_duplicates_char = find_all_duplicate(words, n)
             if n_duplicates_char / len(text) > n_frac:
-                return False, f"duplicated_{n}_n_grams"
+                return False, f"duplicated_n_grams"
 
         return True
