@@ -106,8 +106,8 @@ def main():
                 ),
                 GopherRepetitionFilter(
                     language=language,
-                    top_n_grams=((2, 0.083799), (3, 0.092784), (4, 0.106796)),
-                    dup_n_grams=((5, 0.187500), (6, 0.152717), (7, 0.130554), (8, 0.114391), (9, 0.103792), (10, 0.095107)),
+                    # top_n_grams=((2, 0.083799), (3, 0.092784), (4, 0.106796)),
+                    dup_n_grams=((5, 0.25), (6, 0.23), (7, 0.20), (8, 0.19), (9, 0.18), (10, 0.17)),
                     exclusion_writer=JsonlWriter(
                         os.path.join(QUALITY_FILTERING_REMOVE_PATH, "1_gopher_repetition_filter"),
                         output_filename="${filter_reason}/${rank}.jsonl",
