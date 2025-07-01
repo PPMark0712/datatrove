@@ -36,26 +36,22 @@ class BaseDependencyParser(ABC):
 class ChineseDependencyParser(BaseDependencyParser):
     _requires_dependencies = ["ltp"]
     
-    def __init__(self, n_gpus: int, **kwargs):
+    def __init__(self, gpu_id: int, **kwargs):
         super().__init__()
         if "ltp_model_path" in kwargs:
             ltp_model_path = kwargs["ltp_model_path"]
         else:
             ltp_model_path = "LTP/small"
-        self.ltp = LTP(ltp_model_path)
+        self.ltp = LTP(ltp_model_path).to(f"cuda:{gpu_id}")
         self.batch_size = kwargs.get("batch_size", 32)
         self.max_length = kwargs.get("max_length", 128)
-        self.models = []
-        for i in range(n_gpus):
-            logger.info(f"Loading LTP model on GPU {os.environ['CUDA_VISIBLE_DEVICES'].split(',')[i]}")
-            self.models.append(LTP(ltp_model_path).to(f"cuda:{i}"))
 
-    def predict(self, text: str, rank: int):
+    def predict(self, text: str):
         """
         Returns:
             List[Dict[str, Any]]: List of dictionaries, each containing:
                 - "words": List[str] - Words in the sentence
-                - "dependency_labels": List[str] - Dependency labels for each word
+                - "dep_labels": List[str] - Dependency labels for each word
                 - "parents": List[int] - Parent indices for each word
         """
         chinese_eos_puncts = "。！!？?；;：:\n\t—…"
@@ -63,14 +59,14 @@ class ChineseDependencyParser(BaseDependencyParser):
         parsed_sentences = []
         for i in range(0, len(sentences), self.batch_size):
             batch = sentences[i:i+self.batch_size]
-            outputs = self.models[rank].pipeline(batch, tasks=["cws", "dep"])
+            outputs = self.ltp.pipeline(batch, tasks=["cws", "dep"])
             for cws, dep in zip(outputs.cws, outputs.dep):
                 parents = dep["head"]
                 for i in range(len(parents)):
                     parents[i] -= 1  # LTP use 1-based index
                 parsed_sentences.append({
                     "words": cws,
-                    "dependency_labels": dep["label"],
+                    "dep_labels": dep["label"],
                     "parents": parents,
                 })
         return parsed_sentences
@@ -80,13 +76,13 @@ class DependencyParser(BaseDependencyParser):
     name = "Dependency Parser"
     _requires_dependencies = ["ltp"]
     
-    def __init__(self, language: str, **kwargs):
+    def __init__(self, language: str, n_gpus: int, **kwargs):
         super().__init__()
         self.language = language
         if language == "zh":
-            self.dependency_parser = ChineseDependencyParser(**kwargs)
+            self.dependency_parser = ChineseDependencyParser(n_gpus, **kwargs)
         else:
             raise ValueError(f"Unsupported language: {language}")
     
-    def predict(self, text: str, rank: int):
-        return self.dependency_parser.predict(text, rank)
+    def predict(self, text: str):
+        return self.dependency_parser.predict(text)

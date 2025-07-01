@@ -2,6 +2,7 @@ import math
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from multiprocessing import Manager
 from collections import Counter
 import jieba
 import nltk
@@ -64,14 +65,14 @@ class LexicalDiversityCalculator(PipelineStep):
             for doc_idx, doc in enumerate(data):
                 word_with_pos_tags = self.pos_predictor.predict(doc.text)
                 content_words = self.pos_predictor.get_content_words(word_with_pos_tags)
-                pos_tag_counter = Counter(pos for word, pos in word_with_pos_tags)
-                pos_tag_entropy = calc_counter_entropy(pos_tag_counter)
+                pos_counter = Counter(pos for word, pos in word_with_pos_tags)
+                pos_ent = calc_counter_entropy(pos_counter)
                 content_word_counter = Counter(content_words)
-                content_word_entropy = calc_counter_entropy(content_word_counter)
+                con_ent = calc_counter_entropy(content_word_counter)
                 output_file.write(json.dumps({
                     "doc_id": doc_idx,
-                    "pos_tag_entropy": pos_tag_entropy,
-                    "content_word_entropy": content_word_entropy
+                    "pos_ent": pos_ent,
+                    "con_ent": con_ent
                 }) + "\n")
 
 
@@ -83,22 +84,33 @@ class DocumentDependencyParser(PipelineStep):
         self,
         language: str,
         output_folder: DataFolderLike,
+        n_gpus: int,
+        workers_per_gpu: int,
+        manager,
         **kwargs
     ):
         super().__init__()
         self.language = language
         self.output_folder = output_folder
         self.dependency_parser = DependencyParser(**kwargs)
+        self.workers_per_gpu = workers_per_gpu
+        self.manager = manager
+        self.models_queue = manager.Queue()
+        for gpu_id in range(n_gpus):
+            for _ in range(self.workers_per_gpu):
+                self.models_queue.put(DependencyParser(gpu_id, **kwargs))
 
     def run(self, data: DocumentsPipeline, rank: int = 0, world_size: int = 1):
         with self.track_time():
+            model = self.models_queue.get()
             output_file = self.output_folder.open(f"{rank:05d}.jsonl", mode="w")
             for doc_idx, doc in enumerate(data):
-                parsed_sentences = self.dependency_parser.predict(doc.text, rank)
+                parsed_sentences = model.predict(doc.text)
                 output_file.write(json.dumps({
                     "doc_id": doc_idx,
                     "parsed_sentences": parsed_sentences
                 }) + "\n")
+            self.models_queue.put(model)
 
 
 def calc_tree_height(parents: list[int]) -> int:
@@ -122,13 +134,11 @@ class SyntacticComplexityCalculator(PipelineStep):
 
     def __init__(
         self,
-        language: str,
         input_folder: DataFolderLike,  # dependency parser output
         output_folder: DataFolderLike,  # syntactic complexity output
         **kwargs
     ):
         super().__init__()
-        self.language = language
         self.input_folder = input_folder
         self.output_folder = output_folder
 
@@ -139,8 +149,8 @@ class SyntacticComplexityCalculator(PipelineStep):
             for doc_id, line in input_file:
                 item = json.loads(line)
                 parsed_sentences = item["parsed_sentences"]
-                dependency_label_counter = Counter(label for sentence in parsed_sentences for label in sentence["dependency_labels"])
-                dependency_label_entropy = calc_counter_entropy(dependency_label_counter)
+                dep_label_counter = Counter(label for sentence in parsed_sentences for label in sentence["dep_labels"])
+                dep_ent = calc_counter_entropy(dep_label_counter)
 
                 total_tree_cnt = len(parsed_sentences)
                 total_tree_height = 0
@@ -153,12 +163,54 @@ class SyntacticComplexityCalculator(PipelineStep):
                             continue
                         total_dependency_distance += abs(i - parent)
 
-                avg_tree_height = total_tree_height / total_tree_cnt
-                avg_dependency_distance = total_dependency_distance / total_tree_cnt
+                avg_dep_height = total_tree_height / total_tree_cnt
+                avg_dep_dis = total_dependency_distance / total_tree_cnt
 
                 output_file.write(json.dumps({
                     "doc_id": doc_id,
-                    "dependency_label_entropy": dependency_label_entropy,
-                    "avg_tree_height": avg_tree_height,
-                    "avg_dependency_distance": avg_dependency_distance
+                    "dep_ent": dep_ent,
+                    "avg_dep_height": avg_dep_height,
+                    "avg_dep_dis": avg_dep_dis
                 }) + "\n")
+
+
+class GCCombiner(PipelineStep):
+    name = "GC Combiner"
+
+    def __init__(
+        self,
+        lexical_diversity_folder: DataFolderLike,
+        syntactic_complexity_folder: DataFolderLike,
+        output_folder: DataFolderLike,
+    ):
+        super().__init__()
+        self.lexical_diversity_folder = lexical_diversity_folder
+        self.syntactic_complexity_folder = syntactic_complexity_folder
+        self.output_folder = output_folder
+
+    def run(self, data: DocumentsPipeline = None, rank: int = 0, world_size: int = 1):
+        with self.track_time():
+            lexical_diversity_file = self.lexical_diversity_folder.open(f"{rank:05d}.jsonl", mode="r")
+            syntactic_complexity_file = self.syntactic_complexity_folder.open(f"{rank:05d}.jsonl", mode="r")
+            output_file = self.output_folder.open(f"{rank:05d}.jsonl", mode="w")
+
+            def lexical_diversity_generator():
+                for line in lexical_diversity_file:
+                    item = json.loads(line)
+                    yield {
+                        "pos_ent": item["pos_ent"],
+                        "con_ent": item["con_ent"]
+                    }
+
+            def syntactic_complexity_generator():
+                for line in syntactic_complexity_file:
+                    item = json.loads(line)
+                    yield {
+                        "dep_ent": item["dep_ent"],
+                        "avg_dep_height": item["avg_dep_height"],
+                        "avg_dep_dis": item["avg_dep_dis"]
+                    }
+
+            lexical_diversity_items = lexical_diversity_generator()
+            syntactic_complexity_items = syntactic_complexity_generator()
+            
