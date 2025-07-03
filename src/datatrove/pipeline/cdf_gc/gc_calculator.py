@@ -1,12 +1,8 @@
 import math
 import json
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from multiprocessing import Manager
-from collections import Counter
-import jieba
-import nltk
-from ltp import LTP
+
+from collections import Counter, defaultdict
+from multiprocessing import current_process
 
 from datatrove.data import DocumentsPipeline
 from datatrove.pipeline.base import PipelineStep
@@ -14,7 +10,18 @@ from datatrove.pipeline.writers.disk_base import DiskWriter
 from datatrove.pipeline.cdf_gc import PartOfSpeechPredictor, DependencyParser
 from datatrove.utils.logging import logger
 from datatrove.io import DataFolderLike, get_datafolder
-from datatrove.utils.text import split_into_sentences
+
+
+def preprocess_text(text: str) -> str:
+    new_lines = []
+    lines = text.split("\n")
+    for line in lines:
+        line = line.strip()
+        if line.startswith("|") and line.endswith("|"):
+            line = line.replace("|", " ")
+        new_lines.append(line)
+    return "\n".join(new_lines)
+
 
 def calc_counter_entropy(counter: Counter):
     total = sum(counter.values())
@@ -23,29 +30,8 @@ def calc_counter_entropy(counter: Counter):
     return -sum((count / total) * math.log2(count / total) for count in counter.values())
 
 
-@dataclass
-class GCItem:
-    """GC Item for a given document
-
-    Args:
-        file_id: file id
-        doc_id: document id
-        reader_id: reader id. Used to know from where the next signature should be requested
-    """
-    file_id: int
-    doc_id: int
-    gc_data: dict
-
-    def to_dict(self):
-        return {
-            "file_id": self.file_id,
-            "doc_id": self.doc_id,
-            "gc_data": self.gc_data,
-        }
-
-
-class LexicalDiversityCalculator(PipelineStep):
-    name = "Lexical Diversity Calculator"
+class DocumentPartOfSpeechPredictor(PipelineStep):
+    name = "Document Part of Speech Predictor"
     _requires_dependencies = ["jieba", "nltk"]
 
     def __init__(
@@ -55,22 +41,49 @@ class LexicalDiversityCalculator(PipelineStep):
         **kwargs
     ):
         super().__init__()
-        self.language = language
-        self.output_folder = output_folder
+        self.output_folder = get_datafolder(output_folder)
         self.pos_predictor = PartOfSpeechPredictor(language, **kwargs)
 
     def run(self, data: DocumentsPipeline, rank: int = 0, world_size: int = 1):
         with self.track_time():
             output_file = self.output_folder.open(f"{rank:05d}.jsonl", mode="w")
             for doc_idx, doc in enumerate(data):
-                word_with_pos_tags = self.pos_predictor.predict(doc.text)
-                content_words = self.pos_predictor.get_content_words(word_with_pos_tags)
-                pos_counter = Counter(pos for word, pos in word_with_pos_tags)
-                pos_ent = calc_counter_entropy(pos_counter)
+                words, pos_tags = self.pos_predictor.predict(preprocess_text(doc.text))
+                content_words = self.pos_predictor.get_content_words(words, pos_tags)
                 content_word_counter = Counter(content_words)
+                output_file.write(json.dumps({
+                    "words": words,
+                    "pos_tags": pos_tags,
+                    "content_words_counter": content_word_counter,
+                    "token_count": doc.metadata["token_count"],
+                }, ensure_ascii=False) + "\n")
+
+
+class LexicalDiversityCalculator(PipelineStep):
+    name = "Lexical Diversity Calculator"
+    _requires_dependencies = ["jieba", "nltk"]
+
+    def __init__(
+        self,
+        input_folder: DataFolderLike,
+        output_folder: DataFolderLike,
+        **kwargs
+    ):
+        super().__init__()
+        self.input_folder = get_datafolder(input_folder)
+        self.output_folder = get_datafolder(output_folder)
+
+    def run(self, data: DocumentsPipeline, rank: int = 0, world_size: int = 1):
+        with self.track_time():
+            input_file = self.input_folder.open(f"{rank:05d}.jsonl", mode="r")
+            output_file = self.output_folder.open(f"{rank:05d}.jsonl", mode="w")
+            for line in input_file:
+                item = json.loads(line)
+                pos_counter = Counter(item["pos_tags"])
+                pos_ent = calc_counter_entropy(pos_counter)
+                content_word_counter = item["content_words_counter"]
                 con_ent = calc_counter_entropy(content_word_counter)
                 output_file.write(json.dumps({
-                    "doc_id": doc_idx,
                     "pos_ent": pos_ent,
                     "con_ent": con_ent
                 }) + "\n")
@@ -86,31 +99,26 @@ class DocumentDependencyParser(PipelineStep):
         output_folder: DataFolderLike,
         n_gpus: int,
         workers_per_gpu: int,
-        manager,
         **kwargs
     ):
         super().__init__()
         self.language = language
-        self.output_folder = output_folder
-        self.dependency_parser = DependencyParser(**kwargs)
+        self.output_folder = get_datafolder(output_folder)
+        self.n_gpus = n_gpus
         self.workers_per_gpu = workers_per_gpu
-        self.manager = manager
-        self.models_queue = manager.Queue()
-        for gpu_id in range(n_gpus):
-            for _ in range(self.workers_per_gpu):
-                self.models_queue.put(DependencyParser(gpu_id, **kwargs))
+        self.kwargs = kwargs
 
     def run(self, data: DocumentsPipeline, rank: int = 0, world_size: int = 1):
         with self.track_time():
-            model = self.models_queue.get()
+            local_rank = current_process()._identity[0] - 1
+            model = DependencyParser(self.language, local_rank % self.n_gpus, **self.kwargs)
             output_file = self.output_folder.open(f"{rank:05d}.jsonl", mode="w")
             for doc_idx, doc in enumerate(data):
                 parsed_sentences = model.predict(doc.text)
                 output_file.write(json.dumps({
                     "doc_id": doc_idx,
                     "parsed_sentences": parsed_sentences
-                }) + "\n")
-            self.models_queue.put(model)
+                }, ensure_ascii=False) + "\n")
 
 
 def calc_tree_height(parents: list[int]) -> int:
@@ -130,7 +138,7 @@ def calc_tree_height(parents: list[int]) -> int:
 
 class SyntacticComplexityCalculator(PipelineStep):
     name = "Syntactic Complexity Calculator"
-    _requires_dependencies = ["ltp"]
+    _requires_dependencies = ["ltp", "torch"]
 
     def __init__(
         self,
@@ -139,8 +147,8 @@ class SyntacticComplexityCalculator(PipelineStep):
         **kwargs
     ):
         super().__init__()
-        self.input_folder = input_folder
-        self.output_folder = output_folder
+        self.input_folder = get_datafolder(input_folder)
+        self.output_folder = get_datafolder(output_folder)
 
     def run(self, data: DocumentsPipeline = None, rank: int = 0, world_size: int = 1):
         with self.track_time():
@@ -184,9 +192,9 @@ class GCCombiner(PipelineStep):
         output_folder: DataFolderLike,
     ):
         super().__init__()
-        self.lexical_diversity_folder = lexical_diversity_folder
-        self.syntactic_complexity_folder = syntactic_complexity_folder
-        self.output_folder = output_folder
+        self.lexical_diversity_folder = get_datafolder(lexical_diversity_folder)
+        self.syntactic_complexity_folder = get_datafolder(syntactic_complexity_folder)
+        self.output_folder = get_datafolder(output_folder)
 
     def run(self, data: DocumentsPipeline = None, rank: int = 0, world_size: int = 1):
         with self.track_time():
@@ -199,7 +207,8 @@ class GCCombiner(PipelineStep):
                     item = json.loads(line)
                     yield {
                         "pos_ent": item["pos_ent"],
-                        "con_ent": item["con_ent"]
+                        "con_ent": item["con_ent"],
+                        "token_count": item["token_count"]
                     }
 
             def syntactic_complexity_generator():
@@ -213,4 +222,56 @@ class GCCombiner(PipelineStep):
 
             lexical_diversity_items = lexical_diversity_generator()
             syntactic_complexity_items = syntactic_complexity_generator()
-            
+            for doc_id, (lexical_diversity_item, syntactic_complexity_item) in enumerate(zip(lexical_diversity_items, syntactic_complexity_items)):
+                output_file.write(json.dumps({
+                    "doc_id": doc_id,
+                    **lexical_diversity_item,
+                    **syntactic_complexity_item,
+                }) + "\n")
+
+
+class SampleProbabilityCalculator(PipelineStep):
+    name = "Sample Probability Calculator"
+
+    def __init__(
+        self,
+        input_folder: DataFolderLike,
+        output_folder: DataFolderLike,
+        sample_token_rate: float = 0.2,
+        rate_for_hard_sample: float = 0.4,
+        gc_components: list[str] = ["pos_ent", "con_ent", "dep_ent", "avg_dep_height", "avg_dep_dis"],
+        weights: list[float] = [0.2, 0.2, 0.2, 0.2, 0.2],
+    ):
+        super().__init__()
+        self.input_folder = get_datafolder(input_folder)
+        self.output_folder = get_datafolder(output_folder)
+        self.sample_token_rate = sample_token_rate
+        self.rate_for_hard_sample = rate_for_hard_sample
+        self.gc_components = gc_components
+        self.weights = weights
+
+    def get_min_max_values(self, world_size: int):
+        min_max_values_dict = {}
+        for gc_component in self.gc_components:
+            min_max_values_dict[gc_component] = [float("inf"), float("-inf")]
+        for rank in range(world_size):
+            input_file = self.input_folder.open(f"{rank:05d}.jsonl", mode="r")
+            for line in input_file:
+                item = json.loads(line)
+                for gc_component in self.gc_components:
+                    min_max_values_dict[gc_component][0] = min(min_max_values_dict[gc_component][0], item[gc_component])
+                    min_max_values_dict[gc_component][1] = max(min_max_values_dict[gc_component][1], item[gc_component])
+        return min_max_values_dict
+
+    def run(self, data: DocumentsPipeline = None, rank: int = 0, world_size: int = 1):
+        with self.track_time():
+            min_max_values_dict = self.get_min_max_values(world_size)
+            for rank in range(world_size):
+                input_file = self.input_folder.open(f"{rank:05d}.jsonl", mode="r")
+                output_file = self.output_folder.open(f"{rank:05d}.jsonl", mode="w")
+                for line in input_file:
+                    item = json.loads(line)
+                    for gc_component in self.gc_components:
+                        item[gc_component] = (item[gc_component] - min_max_values_dict[gc_component][0]) / (min_max_values_dict[gc_component][1] - min_max_values_dict[gc_component][0])
+                    output_file.write(json.dumps(item) + "\n")
+

@@ -3,7 +3,7 @@ from copy import deepcopy
 from functools import partial
 from typing import Callable
 
-import multiprocess
+import multiprocessing
 
 from datatrove.executor.base import PipelineExecutor
 from datatrove.io import DataFolderLike
@@ -108,39 +108,39 @@ class LocalPipelineExecutor(PipelineExecutor):
             return
 
         self.save_executor_as_json()
-        mg = multiprocess.Manager()
-        ranks_q = mg.Queue()
-        for i in range(self.workers):
-            ranks_q.put(i)
+        with multiprocessing.Manager() as mg:
+            ranks_q = mg.Queue()
+            for i in range(self.workers):
+                ranks_q.put(i)
 
-        ranks_to_run = self.get_incomplete_ranks(
-            range(self.local_rank_offset, self.local_rank_offset + self.local_tasks)
-        )
-        if (skipped := self.local_tasks - len(ranks_to_run)) > 0:
-            logger.info(f"Skipping {skipped} already completed tasks")
+            ranks_to_run = self.get_incomplete_ranks(
+                range(self.local_rank_offset, self.local_rank_offset + self.local_tasks)
+            )
+            if (skipped := self.local_tasks - len(ranks_to_run)) > 0:
+                logger.info(f"Skipping {skipped} already completed tasks")
 
-        if self.workers == 1:
-            pipeline = self.pipeline
-            stats = []
-            for rank in ranks_to_run:
-                self.pipeline = deepcopy(pipeline)
-                stats.append(self._launch_run_for_rank(rank, ranks_q))
-        else:
-            completed_counter = mg.Value("i", skipped)
-            completed_lock = mg.Lock()
-            ctx = multiprocess.get_context(self.start_method)
-            with ctx.Pool(self.workers) as pool:
-                stats = list(
-                    pool.imap_unordered(
-                        partial(
-                            self._launch_run_for_rank,
-                            ranks_q=ranks_q,
-                            completed=completed_counter,
-                            completed_lock=completed_lock,
-                        ),
-                        ranks_to_run,
+            if self.workers == 1:
+                pipeline = self.pipeline
+                stats = []
+                for rank in ranks_to_run:
+                    self.pipeline = deepcopy(pipeline)
+                    stats.append(self._launch_run_for_rank(rank, ranks_q))
+            else:
+                completed_counter = mg.Value("i", skipped)
+                completed_lock = mg.Lock()
+                ctx = multiprocessing.get_context(self.start_method)
+                with ctx.Pool(self.workers) as pool:
+                    stats = list(
+                        pool.imap_unordered(
+                            partial(
+                                self._launch_run_for_rank,
+                                ranks_q=ranks_q,
+                                completed=completed_counter,
+                                completed_lock=completed_lock,
+                            ),
+                            ranks_to_run,
+                        )
                     )
-                )
         # merged stats
         stats = sum(stats, start=PipelineStats())
         with self.logging_dir.open("stats.json", "wt") as statsfile:

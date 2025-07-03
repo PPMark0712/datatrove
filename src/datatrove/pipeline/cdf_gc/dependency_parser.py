@@ -76,11 +76,11 @@ class DependencyParser(BaseDependencyParser):
     name = "Dependency Parser"
     _requires_dependencies = ["ltp"]
     
-    def __init__(self, language: str, n_gpus: int, **kwargs):
+    def __init__(self, language: str, gpu_id: int, **kwargs):
         super().__init__()
         self.language = language
         if language == "zh":
-            self.dependency_parser = ChineseDependencyParser(n_gpus, **kwargs)
+            self.dependency_parser = ChineseDependencyParser(gpu_id, **kwargs)
         else:
             raise ValueError(f"Unsupported language: {language}")
     
