@@ -4,15 +4,17 @@ class SAM:
         self.fa = [None]
         self.len = [0]
         self.idx = [None]
+        self.exist = [False]
 
-    def _new_node(self):
+    def _new_node(self) -> int:
         self.trans.append(None)
         self.fa.append(None)
         self.len.append(None)
         self.idx.append(None)
+        self.exist.append(False)
         return len(self.trans) - 1
     
-    def extend(self, c, last):
+    def extend(self, c: str, last: int) -> int:
         if c in self.trans[last]:
             p = last
             q = self.trans[p][c]
@@ -54,7 +56,13 @@ class SAM:
                     p = self.fa[p]
         return np
 
-    def add_string(self, s):
+    def add_string(self, s: str):
         last = 0
         for c in s:
             last = self.extend(c, last)
+        self.exist[last] = True
+
+    def trans_keep_suffix(self, p: int, c: str) -> int:
+        while p != 0 and c not in self.trans[p]:
+            p = self.fa[p]
+        return self.trans[p].get(c, 0)

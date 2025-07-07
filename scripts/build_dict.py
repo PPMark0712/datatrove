@@ -1,5 +1,6 @@
 import argparse
 import os
+import itertools
 
 from datatrove.executor import LocalPipelineExecutor
 from datatrove.pipeline.cl import DictBuilder, DictMerger
@@ -18,14 +19,16 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
+    result_path = os.path.join(args.output_path, "output")
     log_path = os.path.join(args.output_path, "logs")
+
     levels = os.listdir(args.input_path)
     levels.sort()
     for level in levels:
         if level == "university":
             continue
         leval_input_path = os.path.join(args.input_path, level)
-        level_output_path = os.path.join(args.output_path, level)
+        level_output_path = os.path.join(result_path, level)
         extracted_path = os.path.join(level_output_path, "extracted")
         merged_path = os.path.join(level_output_path, "merged")
         level_log_path = os.path.join(log_path, level)
@@ -63,3 +66,29 @@ if __name__ == "__main__":
             logging_dir=os.path.join(level_log_path, "merge"),
         )
         merge_executor.run()
+
+    levels = os.listdir(result_path)
+    level_words = {}
+    for level in levels:
+        with open(os.path.join(result_path, level, "merged", "merged_dict.txt"), "r") as f:
+            words = f.read().splitlines()
+        level_words[level] = set(words)
+    
+    levels = ["primary", "junior_high", "senior_high"]
+
+    # 按顺序去除前面 level 已经出现过的词
+    previous_words = set()
+    for level in levels:
+        words = level_words.get(level, set())
+        level_words[level] = words - previous_words
+        previous_words.update(words)
+    
+    final_path = os.path.join(args.output_path, "final")
+    os.makedirs(final_path, exist_ok=True)
+    for level in levels:
+        words = level_words.get(level, set())
+        words = list(words)
+        words.sort()
+        with open(os.path.join(final_path, f"{level}.txt"), "w") as f:
+            for word in words:
+                f.write(word + "\n")

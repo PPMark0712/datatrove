@@ -15,10 +15,19 @@ from datatrove.pipeline.filters import (
     LambdaFilter
 )
 from datatrove.pipeline.formatters import PIIFormatter
-from datatrove.pipeline.readers import JsonlReader
+from datatrove.pipeline.readers import JsonlReader,ParquetReader
 from datatrove.pipeline.tokens import TokensCounter
 from datatrove.pipeline.writers.jsonl import JsonlWriter
 from datatrove.utils.hashing import HashConfig
+
+
+def wudao_adapter(self, data: dict, path: str, id_in_file: int | str):
+    return {
+        "text": data.pop("title") + "\n" + data.pop("content"),
+        "id": data.pop("id", f"{path}/{id_in_file}"),
+        "media": data.pop("media", []),
+        "metadata": data,
+    }
 
 
 def get_args():
@@ -57,10 +66,11 @@ def main():
     
     language_filter_executor = LocalPipelineExecutor(
         pipeline=[
-            JsonlReader(
+            ParquetReader(
                 args.input_path,
                 glob_pattern=args.glob_pattern,
                 limit=args.limit,
+                adapter=wudao_adapter,
             ),
             LanguageFilter(
                 languages=args.languages,

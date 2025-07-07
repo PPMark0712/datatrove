@@ -6,6 +6,7 @@ from datatrove.pipeline.cl.word_extractor import WordExtractor
 
 class DictBuilder(PipelineStep):
     name = "🔤 - Dict builder"
+    type = "cl"
 
     def __init__(
         self,
