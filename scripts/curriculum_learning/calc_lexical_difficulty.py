@@ -1,10 +1,9 @@
 import os
 import argparse
-from functools import partial
 
 from datatrove.executor.local import LocalPipelineExecutor
 from datatrove.pipeline.readers import ParquetReader
-from datatrove.pipeline.cl.lexical_difficulty_calculator import LexicalDifficultyLabeler
+from datatrove.pipeline.cl.lexical_difficulty_calculator import LexicalDifficultyLabeler, LexicalDifficultySorter
 from datatrove.pipeline.writers.jsonl import JsonlWriter
 
 def wudao_adapter(self, data: dict, path: str, id_in_file: int | str):
@@ -45,10 +44,17 @@ def main():
             ),
             LexicalDifficultyLabeler(
                 dict_files={
-                    "primary": "/data1/yyz/data/ChinaTextBook_processed/words/final/primary.txt",
-                    "junior_high": "/data1/yyz/data/ChinaTextBook_processed/words/final/junior_high.txt",
-                    "senior_high": "/data1/yyz/data/ChinaTextBook_processed/words/final/senior_high.txt",
-                    # "stop_words": "/data1/yyz/data/ChinaTextBook_processed/words/final/stop_words.txt",
+                    "primary": "/data1/yyz/data/ChinaTextBook_processed/words_0707/final/primary.txt",
+                    "junior_high": "/data1/yyz/data/ChinaTextBook_processed/words_0707/final/junior_high.txt",
+                    "senior_high": "/data1/yyz/data/ChinaTextBook_processed/words_0707/final/senior_high.txt",
+                },
+            ),
+            LexicalDifficultySorter(
+                weights={
+                    "primary": 1,
+                    "junior_high": 1e2,
+                    "senior_high": 1e4,
+                    "other": 1e6,
                 },
             ),
             JsonlWriter(

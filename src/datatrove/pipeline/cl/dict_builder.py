@@ -2,7 +2,7 @@ from datatrove.data import DocumentsPipeline
 from datatrove.io import DataFolderLike, get_datafolder
 from datatrove.pipeline.base import PipelineStep
 from datatrove.pipeline.cl.word_extractor import WordExtractor
-
+from datatrove.utils.logging import logger
 
 class DictBuilder(PipelineStep):
     name = "🔤 - Dict builder"
@@ -24,7 +24,10 @@ class DictBuilder(PipelineStep):
             words = []
             word_extractor = WordExtractor(self.language, **self.kwargs)
             for doc in data:
-                words.extend(word_extractor.extract_words(doc.text))
+                current_words = word_extractor.extract_words(doc.text)
+                words.extend(current_words)
+                # logger.info(f"text: {doc.text}")
+                # logger.info(f"words: {current_words}")
             words = list(set(words))
             words.sort()
             output_file = self.output_folder.open(f"{rank:05d}.txt", mode="w")

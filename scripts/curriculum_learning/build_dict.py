@@ -1,7 +1,6 @@
 import argparse
 import os
-import itertools
-
+os.environ["JIEBA_CACHE_DIR"] = "/data1/yyz/.cache/jieba"
 from datatrove.executor import LocalPipelineExecutor
 from datatrove.pipeline.cl import DictBuilder, DictMerger
 from datatrove.pipeline.readers import JsonlReader
@@ -13,7 +12,7 @@ def parse_args():
     parser.add_argument("--output_path", type=str, required=True)
     parser.add_argument("--language", type=str, default="zh")
     parser.add_argument("--rerun", action="store_true")
-    parser.add_argument("--ltp_model_path", type=str, default="/data1/yyz/downloads/models/LTP/small")
+    parser.add_argument("--limit", type=int, default=-1)
     return parser.parse_args()
 
 
@@ -38,12 +37,13 @@ if __name__ == "__main__":
             pipeline=[
                 JsonlReader(
                     leval_input_path,
-                    # limit=1
+                    limit=args.limit
                 ),
                 DictBuilder(
                     language=args.language,
                     output_folder=extracted_path,
-                    ltp_model_path=args.ltp_model_path,
+                    ltp_model_path="/data1/yyz/downloads/models/LTP/small",
+                    use_ltp_clean=True,
                 )
             ],
             tasks=file_cnt,
