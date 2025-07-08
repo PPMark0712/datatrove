@@ -12,7 +12,7 @@ from datatrove.utils.logging import logger
 from datatrove.utils.stats import PipelineStats
 
 
-class LocalPipelineExecutor(PipelineExecutor):
+class MpPipelineExecutor(PipelineExecutor):
     """Executor to run a pipeline locally
 
     Args:
@@ -39,7 +39,7 @@ class LocalPipelineExecutor(PipelineExecutor):
         tasks: int = 1,
         workers: int = -1,
         logging_dir: DataFolderLike = None,
-        depends: "LocalPipelineExecutor" = None,
+        depends: "MpPipelineExecutor" = None,
         skip_completed: bool = True,
         start_method: str = "forkserver",
         local_tasks: int = -1,
@@ -90,7 +90,7 @@ class LocalPipelineExecutor(PipelineExecutor):
         Returns:
 
         """
-        assert not self.depends or (isinstance(self.depends, LocalPipelineExecutor)), (
+        assert not self.depends or (isinstance(self.depends, MpPipelineExecutor)), (
             "depends= must be a LocalPipelineExecutor"
         )
         if self.depends:
