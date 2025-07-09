@@ -1,16 +1,17 @@
 import os
 import argparse
-import multiprocessing
-import torch
 
-from datatrove.executor.local import LocalPipelineExecutor
+from datatrove.executor import LocalPipelineExecutor, MpPipelineExecutor
 from datatrove.pipeline.cdf_gc import (
     DocumentPartOfSpeechPredictor,
     LexicalDiversityCalculator,
     DocumentDependencyParser,
-    SyntacticComplexityCalculator
+    SyntacticComplexityCalculator,
+    GcCombiner,
+    ProbabilityCalculator,
+    ProbabilitySampler,
 )
-from datatrove.pipeline.formatters import PIIFormatter
+
 from datatrove.pipeline.readers import JsonlReader
 from datatrove.pipeline.tokens import TokensCounter
 from datatrove.pipeline.writers.jsonl import JsonlWriter
@@ -31,6 +32,7 @@ def get_args():
     parser.add_argument("--n_gpus", type=int, default=0)
     parser.add_argument("--limit", type=int, default=-1)
     args = parser.parse_args()
+    assert args.n_gpus == os.environ["CUDA_VISIBLE_DEVICES"].count(",") + 1
     return args
 
 
@@ -42,9 +44,10 @@ def main():
     lexical_diversity_path = os.path.join(gc_path, "lexical_diversity")
     dependency_parsing_path = os.path.join(gc_path, "dependency_parsing")
     syntactic_complexity_path = os.path.join(gc_path, "syntactic_complexity")
+    gc_result_path = os.path.join(gc_path, "result")
     log_path = os.path.join(main_output_path, "logs")
 
-    denpendency_parsing_excecutor = LocalPipelineExecutor(
+    denpendency_parsing_excecutor = MpPipelineExecutor(
         pipeline=[
             JsonlReader(
                 data_folder=args.input_path,
@@ -88,29 +91,40 @@ def main():
     )
     part_of_speech_predicting_executor.run()
 
-    # information_merging_executor = LocalPipelineExecutor(
+    information_merging_executor = LocalPipelineExecutor(
+        pipeline=[
+            LexicalDiversityCalculator(
+                input_folder=part_of_speech_predicting_path,
+                output_folder=lexical_diversity_path,
+            ),
+            SyntacticComplexityCalculator(
+                input_folder=dependency_parsing_path,
+                output_folder=syntactic_complexity_path,
+            ),
+            GcCombiner(
+                lexical_diversity_folder=lexical_diversity_path,
+                syntactic_complexity_folder=syntactic_complexity_path,
+                output_folder=gc_result_path,
+            ),
+        ],
+        tasks=args.tasks,
+        workers=args.workers,
+        skip_completed=not args.rerun,
+        logging_dir=os.path.join(log_path, "gc", "gc_calculator"),
+    )
+    information_merging_executor.run()
+    
+    # sample_probability_calculator_executor = LocalPipelineExecutor(
     #     pipeline=[
-    #         LexicalDiversityCalculator(
-    #             input_folder=part_of_speech_predicting_path,
-    #             output_folder=lexical_diversity_path,
-    #         ),
-    #         SyntacticComplexityCalculator(
-    #             input_folder=dependency_parsing_path,
-    #             output_folder=syntactic_complexity_path,
-    #         ),
-    #         GCCombiner(
-    #             lexical_diversity_folder=lexical_diversity_path,
-    #             syntactic_complexity_folder=syntactic_complexity_path,
-    #             output_folder=gc_path,
-    #         ),
+
     #     ],
     #     tasks=args.tasks,
     #     workers=args.workers,
     #     skip_completed=not args.rerun,
-    #     logging_dir=os.path.join(log_path, "gc", "gc_calculator"),
+    #     logging_dir=os.path.join(log_path, "cdf_sampling", "calc_prob"),
     # )
-    # information_merging_executor.run()
-    
+
+
 
 if __name__ == "__main__":
     main()

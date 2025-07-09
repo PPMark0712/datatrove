@@ -14,13 +14,13 @@ def split_into_sentences(text: str, max_length: int, punctuations: str):
     while i < text_len:
         if text[i] in punctuations or i - start + 1 >= max_length:
             sentence = text[start:i + 1]
-            if sentence.strip():
+            if any(c.isalpha() for c in sentence):
                 sentences.append(sentence.strip())
             start = i + 1
         i += 1
     if start < text_len:
         sentence = text[start:]
-        if sentence.strip():
+        if any(c.isalpha() for c in sentence):
             sentences.append(sentence.strip())
     return sentences
 
@@ -54,7 +54,7 @@ class ChineseDependencyParser(BaseDependencyParser):
                 - "dep_labels": List[str] - Dependency labels for each word
                 - "parents": List[int] - Parent indices for each word
         """
-        chinese_eos_puncts = "。！!？?；;：:\n\t—…"
+        chinese_eos_puncts = "。！!？?；;|\n\t…"
         sentences = split_into_sentences(text, punctuations=chinese_eos_puncts, max_length=self.max_length)
         parsed_sentences = []
         for i in range(0, len(sentences), self.batch_size):

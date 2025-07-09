@@ -1,0 +1,139 @@
+import json
+import random
+
+from datatrove.data import DocumentsPipeline
+from datatrove.pipeline.base import PipelineStep
+from datatrove.io import DataFolderLike, get_datafolder
+
+class ProbabilityCalculator(PipelineStep):
+    name = "Probability Calculator"
+
+    def __init__(
+        self,
+        input_folder: DataFolderLike,
+        output_folder: DataFolderLike,
+        sample_token_rate: float = 0.2,
+        rate_for_hard_sample: float = 0.4,
+        gc_components: list[str] = ["pos_ent", "con_ent", "dep_ent", "avg_dep_height", "avg_dep_dis"],
+        weights: list[float] = [0.2, 0.2, 0.2, 0.2, 0.2],
+    ):
+        super().__init__()
+        self.input_folder = get_datafolder(input_folder)
+        self.output_folder = get_datafolder(output_folder)
+        self.sample_token_rate = sample_token_rate
+        self.rate_for_hard_sample = rate_for_hard_sample
+        self.gc_components = gc_components
+        self.weights = weights
+
+    def get_min_max_values(self, world_size: int):
+        min_max_values_dict = {}
+        for gc_component in self.gc_components:
+            min_max_values_dict[gc_component] = [float("inf"), float("-inf")]
+        for rank in range(world_size):
+            input_file = self.input_folder.open(f"{rank:05d}.jsonl", mode="r")
+            for line in input_file:
+                item = json.loads(line)
+                for gc_component in self.gc_components:
+                    min_max_values_dict[gc_component][0] = min(min_max_values_dict[gc_component][0], item[gc_component])
+                    min_max_values_dict[gc_component][1] = max(min_max_values_dict[gc_component][1], item[gc_component])
+        return min_max_values_dict
+
+    def run(self, data: DocumentsPipeline = None, rank: int = 0, world_size: int = 1):
+        with self.track_time():
+            min_max_values_dict = self.get_min_max_values(world_size)
+            gc_data = []
+            for rank in range(world_size):
+                input_file = self.input_folder.open(f"{rank:05d}.jsonl", mode="r")
+                for doc_id, line in enumerate(input_file):
+                    item = json.loads(line)
+                    gc_score = 0
+                    for gc_component, weight in zip(self.gc_components, self.weights):
+                        min_value, max_value = min_max_values_dict[gc_component]
+                        if max_value != min_value:
+                            gc_score += (item[gc_component] - min_value) / (max_value - min_value) * weight
+                    gc_data.append({
+                        "rank": rank,
+                        "doc_id": doc_id,
+                        "gc_score": gc_score,
+                        "token_count": item["token_count"],
+                        "gc_component_values": {
+                            gc_component: item[gc_component] for gc_component in self.gc_components
+                        }
+                    })
+            idxs = list(range(len(gc_data)))
+            idxs.sort(key=lambda x: gc_data[x]["gc_score"])
+            total_tokens = sum(x["token_count"] for x in gc_data)
+            sample_tokens = int(total_tokens * self.sample_token_rate)
+            hard_sample_tokens = int(total_tokens * self.rate_for_hard_sample)
+            cdf_sample_tokens = sample_tokens - hard_sample_tokens
+
+            # hard sample
+            hard_sample_idx = len(idxs)
+            cur_hard_sample_tokens = 0
+            for i in range(len(idxs) - 1, -1, -1):
+                if cur_hard_sample_tokens + gc_data[idxs[i]]["token_count"] > hard_sample_tokens:
+                    break
+                hard_sample_idx = i
+                cur_hard_sample_tokens += gc_data[idxs[i]]["token_count"]
+            
+            hard_sample_result = [{
+                **gc_data[i],
+                "prob": 1.0,
+            } for i in idxs[hard_sample_idx:]] if hard_sample_idx < len(idxs) else []
+
+            # cdf sample
+            base_expected_tokens = 0
+            total_tokens = sum(x["token_count"] for x in gc_data[:hard_sample_idx])
+            accumulated_tokens = 0
+            for i in range(hard_sample_idx):
+                accumulated_tokens += gc_data[idxs[i]]["token_count"]
+                base_expected_tokens += accumulated_tokens / total_tokens * gc_data[idxs[i]]["gc_score"]
+
+            r = cdf_sample_tokens / base_expected_tokens if base_expected_tokens > 0 else 0
+            cdf_sample_result = []
+            accumulated_tokens = 0
+            for i in range(hard_sample_idx):
+                accumulated_tokens += gc_data[idxs[i]]["token_count"]
+                cdf = accumulated_tokens / total_tokens
+                cdf_sample_result.append({
+                    **gc_data[i],
+                    "prob": min(1, r * cdf),
+                })
+
+            sample_result = hard_sample_result + cdf_sample_result
+
+            sample_result.sort(key=lambda x: (x["rank"], x["doc_id"]))
+
+            rank_dict = {rank: [] for rank in range(world_size)}
+            for item in sample_result:
+                rank_dict[item["rank"]].append(item)
+            for rank in rank_dict:
+                rank_dict[rank].sort(key=lambda x: x["doc_id"])
+            
+            for rank, result in rank_dict.items():
+                output_file = self.output_folder.open(f"{rank:05d}.json", mode="w")
+                probs = [item["prob"] for item in result]
+                output_file.write(json.dumps(probs))
+                # output_file.write(json.dumps(result, ensure_ascii=False, indent=4))
+
+            
+class ProbabilitySampler(PipelineStep):
+    name = "Probability Sampler"
+
+    def __init__(
+        self,
+        prob_folder: DataFolderLike,
+        seed: int = 42,
+    ):
+        super().__init__()
+        self.prob_folder = get_datafolder(prob_folder)
+        random.seed(seed)
+
+    def run(self, data: DocumentsPipeline = None, rank: int = 0, world_size: int = 1):
+        with self.track_time():
+            prob_file = self.prob_folder.open(f"{rank:05d}.json", mode="r")
+            probs = json.load(prob_file)
+            for doc, prob in zip(data, probs):
+                rand_val = random.uniform(0, 1)
+                if rand_val <= prob:
+                    yield doc
