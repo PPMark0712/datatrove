@@ -11,11 +11,9 @@ from datatrove.pipeline.cdf_gc import (
     ProbabilityCalculator,
     ProbabilitySampler,
 )
-
 from datatrove.pipeline.readers import JsonlReader
 from datatrove.pipeline.tokens import TokensCounter
 from datatrove.pipeline.writers.jsonl import JsonlWriter
-
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -32,7 +30,7 @@ def get_args():
     parser.add_argument("--n_gpus", type=int, default=0)
     parser.add_argument("--limit", type=int, default=-1)
     args = parser.parse_args()
-    assert args.n_gpus == os.environ["CUDA_VISIBLE_DEVICES"].count(",") + 1
+    assert args.n_gpus == len(os.environ.get("CUDA_VISIBLE_DEVICES", "").split(","))
     return args
 
 
@@ -45,6 +43,10 @@ def main():
     dependency_parsing_path = os.path.join(gc_path, "dependency_parsing")
     syntactic_complexity_path = os.path.join(gc_path, "syntactic_complexity")
     gc_result_path = os.path.join(gc_path, "result")
+    sampling_path = os.path.join(main_output_path, "sampling")
+    probability_path = os.path.join(sampling_path, "probability")
+    sample_result_path = os.path.join(sampling_path, "sample_result")
+
     log_path = os.path.join(main_output_path, "logs")
 
     denpendency_parsing_excecutor = MpPipelineExecutor(
@@ -68,8 +70,6 @@ def main():
         logging_dir=os.path.join(log_path, "gc", "dependency_parsing"),
     )
     denpendency_parsing_excecutor.run()
-    if args.only_dependency_parsing:
-        return
     
     part_of_speech_predicting_executor = LocalPipelineExecutor(
         pipeline=[
@@ -114,18 +114,42 @@ def main():
     )
     information_merging_executor.run()
     
-    # sample_probability_calculator_executor = LocalPipelineExecutor(
-    #     pipeline=[
-
-    #     ],
-    #     tasks=args.tasks,
-    #     workers=args.workers,
-    #     skip_completed=not args.rerun,
-    #     logging_dir=os.path.join(log_path, "cdf_sampling", "calc_prob"),
-    # )
-
+    sample_probability_calculator_executor = LocalPipelineExecutor(
+        pipeline=[
+            ProbabilityCalculator(
+                input_folder=gc_result_path,
+                output_folder=probability_path,
+            ),
+        ],
+        tasks=1,
+        workers=1,
+        skip_completed=not args.rerun,
+        logging_dir=os.path.join(log_path, "sampling", "probability_calculator"),
+    )
+    sample_probability_calculator_executor.run()
+    
+    sample_executor = LocalPipelineExecutor(
+        pipeline=[
+            JsonlReader(
+                data_folder=args.input_path,
+                glob_pattern=args.glob_pattern,
+                limit=args.limit,
+            ),
+            ProbabilitySampler(
+                prob_folder=probability_path
+            ),
+            JsonlWriter(
+                output_folder=sample_result_path,
+                compression=None
+            ),
+        ],
+        tasks=args.tasks,
+        workers=args.workers,
+        skip_completed=not args.rerun,
+        logging_dir=os.path.join(log_path, "sampling", "sample_result"),
+    )
+    sample_executor.run()
 
 
 if __name__ == "__main__":
     main()
-

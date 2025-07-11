@@ -4,6 +4,7 @@ import random
 from datatrove.data import DocumentsPipeline
 from datatrove.pipeline.base import PipelineStep
 from datatrove.io import DataFolderLike, get_datafolder
+from datatrove.utils.logging import logger
 
 class ProbabilityCalculator(PipelineStep):
     name = "Probability Calculator"
@@ -41,6 +42,7 @@ class ProbabilityCalculator(PipelineStep):
     def run(self, data: DocumentsPipeline = None, rank: int = 0, world_size: int = 1):
         with self.track_time():
             min_max_values_dict = self.get_min_max_values(world_size)
+            world_size = len(self.input_folder.glob("*.jsonl"))
             gc_data = []
             for rank in range(world_size):
                 input_file = self.input_folder.open(f"{rank:05d}.jsonl", mode="r")
@@ -64,6 +66,7 @@ class ProbabilityCalculator(PipelineStep):
             idxs.sort(key=lambda x: gc_data[x]["gc_score"])
             total_tokens = sum(x["token_count"] for x in gc_data)
             sample_tokens = int(total_tokens * self.sample_token_rate)
+            logger.info(f"total_tokens: {total_tokens}, sample_tokens: {sample_tokens}")
             hard_sample_tokens = int(total_tokens * self.rate_for_hard_sample)
             cdf_sample_tokens = sample_tokens - hard_sample_tokens
 
@@ -87,7 +90,7 @@ class ProbabilityCalculator(PipelineStep):
             accumulated_tokens = 0
             for i in range(hard_sample_idx):
                 accumulated_tokens += gc_data[idxs[i]]["token_count"]
-                base_expected_tokens += accumulated_tokens / total_tokens * gc_data[idxs[i]]["gc_score"]
+                base_expected_tokens += accumulated_tokens / total_tokens * gc_data[idxs[i]]["token_count"]
 
             r = cdf_sample_tokens / base_expected_tokens if base_expected_tokens > 0 else 0
             cdf_sample_result = []
