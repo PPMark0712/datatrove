@@ -1,7 +1,7 @@
 from datatrove.data import DocumentsPipeline
 from datatrove.pipeline.base import PipelineStep
-from datatrove.pipeline.cl.sam import SAM
-from datatrove.pipeline.cl.word_extractor import WordExtractor
+from datatrove.pipeline.cl_wordnet.sam import SAM
+from datatrove.pipeline.cl_wordnet.word_extractor import WordExtractor
 from datatrove.utils.logging import logger
 
 class LexicalDifficultyLabeler(PipelineStep):

@@ -3,7 +3,7 @@ import argparse
 
 from datatrove.executor.local import LocalPipelineExecutor
 from datatrove.pipeline.readers import ParquetReader
-from datatrove.pipeline.cl.lexical_difficulty_calculator import LexicalDifficultyLabeler, LexicalDifficultySorter
+from datatrove.pipeline.cl_wordnet.lexical_difficulty_calculator import LexicalDifficultyLabeler, LexicalDifficultySorter
 from datatrove.pipeline.writers.jsonl import JsonlWriter
 
 def wudao_adapter(self, data: dict, path: str, id_in_file: int | str):
