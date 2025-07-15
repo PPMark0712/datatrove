@@ -21,7 +21,7 @@ if __name__ == "__main__":
             )
         ],
         tasks=32,
-        workers=1,
+        workers=4,
         logging_dir=log_path
     )
     pipeline_exec.run()
