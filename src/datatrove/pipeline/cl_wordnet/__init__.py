@@ -1,2 +1,1 @@
-from .dict_builder import DictBuilder, DictMerger
 from .lexical_difficulty_calculator import LexicalDifficultyLabeler
