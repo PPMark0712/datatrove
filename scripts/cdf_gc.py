@@ -22,14 +22,15 @@ def get_args():
     parser.add_argument("--output_path", type=str, required=True)
     parser.add_argument("--rerun", action="store_true")
     parser.add_argument("--tasks", type=int, default=64)
-    parser.add_argument("--workers", type=int, default=32)
-    parser.add_argument("--language", type=str, default="zh")
-    parser.add_argument("--tokenizer_path", type=str, required=True)
-    parser.add_argument("--ltp_model_path", type=str, default=None)
-    parser.add_argument("--only_dependency_parsing", action="store_true")
+    parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--language", type=str, default="zh", choices=["zh"])
+    parser.add_argument("--tokenizer_path", type=str, required=True, help="path to tokenizer.json for counting tokens")
+    parser.add_argument("--ltp_model_path", type=str, default=None, help="path to huggingface model: LTP/small")
     parser.add_argument("--dependency_parsing_workers_per_gpu", type=int, default=1)
     parser.add_argument("--n_gpus", type=int, default=0)
     parser.add_argument("--limit", type=int, default=-1)
+    parser.add_argument("--sample_rate", type=float, required=True)
+    parser.add_argument("--rate_for_hard_sample", type=float, default=0.4)
     args = parser.parse_args()
     assert args.n_gpus == len(os.environ.get("CUDA_VISIBLE_DEVICES", "").split(","))
     return args
@@ -120,6 +121,8 @@ def main():
             ProbabilityCalculator(
                 input_folder=gc_result_path,
                 output_folder=probability_path,
+                sample_token_rate=args.sample_rate,
+                rate_for_hard_sample=args.rate_for_hard_sample
             ),
         ],
         tasks=1,
