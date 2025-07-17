@@ -44,6 +44,7 @@ class ProbabilityCalculator(PipelineStep):
             min_max_values_dict = self.get_min_max_values(world_size)
             world_size = len(self.input_folder.glob("*.jsonl"))
             gc_data = []
+            logger.info("Gathering GC scores from all tasks.")
             for rank in range(world_size):
                 input_file = self.input_folder.open(f"{rank:05d}.jsonl", mode="r")
                 for doc_id, line in enumerate(input_file):
@@ -66,8 +67,8 @@ class ProbabilityCalculator(PipelineStep):
             idxs.sort(key=lambda x: gc_data[x]["gc_score"])
             total_tokens = sum(x["token_count"] for x in gc_data)
             sample_tokens = int(total_tokens * self.sample_token_rate)
-            logger.info(f"total_tokens: {total_tokens}, sample_tokens: {sample_tokens}")
-            hard_sample_tokens = int(total_tokens * self.rate_for_hard_sample)
+            logger.info(f"total_tokens: {total_tokens}, expected sample_tokens: {sample_tokens}")
+            hard_sample_tokens = int(sample_tokens * self.rate_for_hard_sample)
             cdf_sample_tokens = sample_tokens - hard_sample_tokens
 
             # hard sample
@@ -78,7 +79,7 @@ class ProbabilityCalculator(PipelineStep):
                     break
                 hard_sample_idx = i
                 cur_hard_sample_tokens += gc_data[idxs[i]]["token_count"]
-            
+
             hard_sample_result = [{
                 **gc_data[i],
                 "prob": 1.0,
@@ -86,38 +87,37 @@ class ProbabilityCalculator(PipelineStep):
 
             # cdf sample
             base_expected_tokens = 0
-            total_tokens = sum(x["token_count"] for x in gc_data[:hard_sample_idx])
+            total_tokens = sum(gc_data[idxs[i]]["token_count"] for i in range(hard_sample_idx))
             accumulated_tokens = 0
             for i in range(hard_sample_idx):
                 accumulated_tokens += gc_data[idxs[i]]["token_count"]
                 base_expected_tokens += accumulated_tokens / total_tokens * gc_data[idxs[i]]["token_count"]
 
             r = cdf_sample_tokens / base_expected_tokens if base_expected_tokens > 0 else 0
+            logger.info(f"r={r}")
             cdf_sample_result = []
             accumulated_tokens = 0
             for i in range(hard_sample_idx):
                 accumulated_tokens += gc_data[idxs[i]]["token_count"]
                 cdf = accumulated_tokens / total_tokens
                 cdf_sample_result.append({
-                    **gc_data[i],
+                    **gc_data[idxs[i]],
                     "prob": min(1, r * cdf),
                 })
 
             sample_result = hard_sample_result + cdf_sample_result
-
             sample_result.sort(key=lambda x: (x["rank"], x["doc_id"]))
-
             rank_dict = {rank: [] for rank in range(world_size)}
             for item in sample_result:
                 rank_dict[item["rank"]].append(item)
             for rank in rank_dict:
                 rank_dict[rank].sort(key=lambda x: x["doc_id"])
-            
+
+            logger.info("Writing sampling probability files.")
             for rank, result in rank_dict.items():
                 output_file = self.output_folder.open(f"{rank:05d}.json", mode="w")
                 probs = [item["prob"] for item in result]
                 output_file.write(json.dumps(probs))
-                # output_file.write(json.dumps(result, ensure_ascii=False, indent=4))
 
             
 class ProbabilitySampler(PipelineStep):

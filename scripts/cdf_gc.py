@@ -24,7 +24,7 @@ def get_args():
     parser.add_argument("--tasks", type=int, default=64)
     parser.add_argument("--workers", type=int, default=32)
     parser.add_argument("--language", type=str, default="zh")
-    parser.add_argument("--tokenizer_path", type=str, default="/data1/yyz/downloads/models/NousResearch/Llama-3.2-1B/tokenizer.json")
+    parser.add_argument("--tokenizer_path", type=str, default="/data/downloads/models/NousResearch/Llama-3.2-1B/tokenizer.json")
     parser.add_argument("--only_dependency_parsing", action="store_true")
     parser.add_argument("--dependency_parsing_workers_per_gpu", type=int, default=1)
     parser.add_argument("--n_gpus", type=int, default=0)
@@ -61,7 +61,7 @@ def main():
                 output_folder=dependency_parsing_path,
                 n_gpus=args.n_gpus,
                 workers_per_gpu=args.dependency_parsing_workers_per_gpu,
-                ltp_model_path="/data1/yyz/downloads/models/LTP/small"
+                ltp_model_path="/data/yingyizhou/downloads/models/LTP/small"
             ),
         ],
         tasks=args.tasks,
@@ -123,7 +123,7 @@ def main():
         ],
         tasks=1,
         workers=1,
-        skip_completed=not args.rerun,
+        skip_completed=False,
         logging_dir=os.path.join(log_path, "sampling", "probability_calculator"),
     )
     sample_probability_calculator_executor.run()
@@ -145,7 +145,7 @@ def main():
         ],
         tasks=args.tasks,
         workers=args.workers,
-        skip_completed=not args.rerun,
+        skip_completed=False,
         logging_dir=os.path.join(log_path, "sampling", "sample_result"),
     )
     sample_executor.run()
