@@ -1,1 +1,1 @@
-from .lexical_difficulty_calculator import LexicalDifficultyLabeler
+from .lexical_difficulty_calculator import LexicalDifficultySorter

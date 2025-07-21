@@ -1,2 +1,7 @@
-python build_dict.py --input_path /data1/yyz/data/ChinaTextBook_processed/splited --output_path /data1/yyz/data/ChinaTextBook_processed/words_0707_1 --language zh --limit 1 --rerun
-python calc_lexical_difficulty.py --input_path /data1/yyz/downloads/datasets/p208p2002/wudao_downsampled --output_path /data1/yyz/data/datatrove_output/wudao_lexical_difficulty --tasks 64 --workers 32 
+python sort_by_lexical_difficulty.py \
+    --input_path /data1/yyz/downloads/datasets/fineweb \
+    --output_path /data1/yyz/data/datatrove_output/fineweb_wordnet \
+    --tasks 32 \
+    --workers 1 \
+    --limit 10 \
+    --rerun

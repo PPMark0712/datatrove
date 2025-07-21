@@ -2,17 +2,9 @@ import os
 import argparse
 
 from datatrove.executor.local import LocalPipelineExecutor
-from datatrove.pipeline.readers import ParquetReader
-from datatrove.pipeline.cl_wordnet.lexical_difficulty_calculator import LexicalDifficultyLabeler, LexicalDifficultySorter
+from datatrove.pipeline.readers import JsonlReader
+from datatrove.pipeline.cl_wordnet.lexical_difficulty_calculator import LexicalDifficultySorter
 from datatrove.pipeline.writers.jsonl import JsonlWriter
-
-def wudao_adapter(self, data: dict, path: str, id_in_file: int | str):
-    return {
-        "text": data.pop("title") + "\n" + data.pop("content"),
-        "id": data.pop("id", f"{path}/{id_in_file}"),
-        "media": data.pop("media", []),
-        "metadata": data,
-    }
 
 
 def get_args():
@@ -36,26 +28,13 @@ def main():
 
     executor = LocalPipelineExecutor(
         pipeline=[
-            ParquetReader(
+            JsonlReader(
                 data_folder=args.input_path,
                 glob_pattern=args.glob_pattern,
-                adapter=wudao_adapter,
                 limit=args.limit,
             ),
-            LexicalDifficultyLabeler(
-                dict_files={
-                    "primary": "/data1/yyz/data/ChinaTextBook_processed/words_0707/final/primary.txt",
-                    "junior_high": "/data1/yyz/data/ChinaTextBook_processed/words_0707/final/junior_high.txt",
-                    "senior_high": "/data1/yyz/data/ChinaTextBook_processed/words_0707/final/senior_high.txt",
-                },
-            ),
             LexicalDifficultySorter(
-                weights={
-                    "primary": 1,
-                    "junior_high": 1e2,
-                    "senior_high": 1e4,
-                    "other": 1e6,
-                },
+                nltk_path="/data1/yyz/downloads/models/nltk_data"
             ),
             JsonlWriter(
                 output_path,
