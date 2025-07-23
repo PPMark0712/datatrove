@@ -43,6 +43,7 @@ class LexicalDifficultySorter(PipelineStep):
         **kwargs
     ):
         super().__init__()
+        self.kwargs = kwargs
         nltk_dependencies = [
             "stopwords"
         ]
@@ -87,6 +88,8 @@ class LexicalDifficultySorter(PipelineStep):
         return normalized_data
 
     def run(self, data: DocumentsPipeline, rank: int = 0, world_size: int = 1):
+        if "nltk_path" in self.kwargs:
+            nltk.data.path.append(self.kwargs["nltk_path"])
         with self.track_time():
             difficulty_data = []
             all_docs = []
@@ -96,6 +99,7 @@ class LexicalDifficultySorter(PipelineStep):
                 text = doc.text
                 sentences = sent_tokenize(text)
                 total_words_counted = 0
+                total_lesked_words_counted = 0
                 sum_hypernym_depth = 0
                 sum_synonym_count = 0
                 abstract_word_count = 0
@@ -114,28 +118,35 @@ class LexicalDifficultySorter(PipelineStep):
                         wn_pos = get_wordnet_pos(pos)
                         synset = lesk(words, word, pos=wn_pos)
                         if synset is not None:
+                            total_lesked_words_counted += 1
                             path = synset.hypernyms()
+                            # logger.info(f"{word}, {path}, {synset}")
                             sum_hypernym_depth += len(path)
                             if len(path) <= 2:
                                 abstract_word_count += 1
                             for hypernym in path[-3:]:
-                                hypernym_counter[hypernym.name()] += 1
+                                hypernym_counter[hypernym.name()] += 1                            
+                        else:
+                            # logger.info("lesk error")
+                            pass
+
                 # if total_words_counted == 0:
                 #     pass
                 avg_hypernym_depth = sum_hypernym_depth / total_words_counted
                 avg_synonym_count = sum_synonym_count / total_words_counted
                 hypernym_entropy = calc_counter_entropy(hypernym_counter)
-                abstract_word_ratio = abstract_word_count / total_words_counted
+                abstract_word_ratio = abstract_word_count / total_lesked_words_counted
                 difficulty_data.append({
                     "avg_hypernym_depth": avg_hypernym_depth,
                     "synonym_richness": avg_synonym_count,
                     "sense_dispersion": hypernym_entropy,
-                    "non_abstract_word_rate": 1 - abstract_word_ratio
+                    # "non_abstract_word_rate": 1 - abstract_word_ratio
                 })
 
             normalized_difficulty_data = self.calc_scores(difficulty_data)
-            for doc, difficulty in zip(all_docs, normalized_difficulty_data):
-                doc.metadata["difficulty"] = difficulty
-            all_docs.sort(key=lambda x: x.metadata["difficulty"]["difficulty_score"])
+            for doc, normalized_difficulty, org_difficulty in zip(all_docs, normalized_difficulty_data, difficulty_data):
+                doc.metadata["difficulty"] = org_difficulty
+                doc.metadata["normalized_difficulty"] = normalized_difficulty
+            all_docs.sort(key=lambda x: x.metadata["normalized_difficulty"]["difficulty_score"])
             for doc in all_docs:
                 yield doc
