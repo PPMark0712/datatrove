@@ -9,4 +9,5 @@ python cdf_gc.py \
     --tokenizer_path /data/downloads/models/NousResearch/Llama-3.2-1B/tokenizer.json \
     --dependency_parsing_workers_per_gpu 4 \
     --limit 10 \
-    --sample_rate 0.2
+    --sample_rate 0.2 \
+    --rerun

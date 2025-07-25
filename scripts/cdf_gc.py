@@ -10,7 +10,7 @@ from datatrove.pipeline.cdf_gc import (
     DocumentDependencyParser,
     SyntacticComplexityCalculator,
     GcCombiner,
-    GCNormalizer,
+    GcNormalizer,
     ProbabilityCalculator,
     ProbabilitySampler,
 )
@@ -138,7 +138,7 @@ def main():
     
     sample_probability_calculator_executor = LocalPipelineExecutor(
         pipeline=[
-            GCNormalizer(
+            GcNormalizer(
                 input_folder=gc_result_path,
                 output_folder=normalized_gc_path,
             ),
