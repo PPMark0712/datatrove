@@ -1,4 +1,5 @@
 import os
+import json
 import argparse
 
 from datatrove.executor import LocalPipelineExecutor, MpPipelineExecutor
@@ -8,6 +9,7 @@ from datatrove.pipeline.cdf_gc import (
     DocumentDependencyParser,
     SyntacticComplexityCalculator,
     GcCombiner,
+    GCNormalizer,
     ProbabilityCalculator,
     ProbabilitySampler,
 )
@@ -27,13 +29,21 @@ def get_args():
     parser.add_argument("--tokenizer_path", type=str, required=True, help="path to tokenizer.json for counting tokens")
     parser.add_argument("--ltp_model_path", type=str, default=None, help="path to huggingface model: LTP/small")
     parser.add_argument("--dependency_parsing_workers_per_gpu", type=int, default=1)
-    parser.add_argument("--n_gpus", type=int, default=0)
     parser.add_argument("--limit", type=int, default=-1)
     parser.add_argument("--sample_rate", type=float, required=True)
     parser.add_argument("--rate_for_hard_sample", type=float, default=0.4)
     args = parser.parse_args()
-    assert args.n_gpus == len(os.environ.get("CUDA_VISIBLE_DEVICES", "").split(","))
+    args.n_gpus = len(os.environ.get("CUDA_VISIBLE_DEVICES", "").split(","))
     return args
+
+
+def input_adapter(self, data: dict, path: str, id_in_file: int | str):
+    return {
+        "text": data.pop("text", ""),
+        "id": data.pop("id", f"{path}/{id_in_file}"),
+        "metadata": {}
+        # "metadata": data,  # remaining data goes into metadata
+    }
 
 
 def main():
@@ -45,6 +55,7 @@ def main():
     dependency_parsing_path = os.path.join(gc_path, "dependency_parsing")
     syntactic_complexity_path = os.path.join(gc_path, "syntactic_complexity")
     gc_result_path = os.path.join(gc_path, "result")
+    normalized_gc_path = os.path.join(gc_path, "normalized_gc")
     sampling_path = os.path.join(main_output_path, "sampling")
     probability_path = os.path.join(sampling_path, "probability")
     sample_result_path = os.path.join(sampling_path, "sample_result")
@@ -57,6 +68,7 @@ def main():
                 data_folder=args.input_path,
                 glob_pattern=args.glob_pattern,
                 limit=args.limit,
+                adapter=input_adapter
             ),
             DocumentDependencyParser(
                 language=args.language,
@@ -79,6 +91,7 @@ def main():
                 data_folder=args.input_path,
                 glob_pattern=args.glob_pattern,
                 limit=args.limit,
+                adapter=input_adapter
             ),
             TokensCounter(args.tokenizer_path),
             DocumentPartOfSpeechPredictor(
@@ -118,8 +131,12 @@ def main():
     
     sample_probability_calculator_executor = LocalPipelineExecutor(
         pipeline=[
-            ProbabilityCalculator(
+            GCNormalizer(
                 input_folder=gc_result_path,
+                output_folder=normalized_gc_path,
+            ),
+            ProbabilityCalculator(
+                input_folder=normalized_gc_path,
                 output_folder=probability_path,
                 sample_token_rate=args.sample_rate,
                 rate_for_hard_sample=args.rate_for_hard_sample
@@ -138,6 +155,7 @@ def main():
                 data_folder=args.input_path,
                 glob_pattern=args.glob_pattern,
                 limit=args.limit,
+                adapter=input_adapter
             ),
             ProbabilitySampler(
                 prob_folder=probability_path
