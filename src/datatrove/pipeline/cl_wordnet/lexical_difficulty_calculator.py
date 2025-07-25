@@ -136,7 +136,7 @@ class LexicalDifficultySorter(PipelineStep):
                         wn_pos = get_wordnet_pos(pos)
                         synset = lesk(words, word, pos=wn_pos)
                         if synset is not None:
-                            path = synset.hypernyms()
+                            path = synset.hypernym_paths()[0]
                             # logger.info(f"{word}, {path}, {synset}")
                             sum_hypernym_depth += len(path)
                             for hypernym in path[-3:]:
@@ -158,9 +158,9 @@ class LexicalDifficultySorter(PipelineStep):
 
                 difficulty_data.append({
                     "avg_hypernym_depth": avg_hypernym_depth,
-                    "synonym_richness": avg_synonym_count,
-                    "sense_dispersion": hypernym_entropy,
-                    "abstract_score": avg_concreteness_score
+                    # "synonym_richness": avg_synonym_count,
+                    # "sense_dispersion": hypernym_entropy,
+                    # "abstract_score": avg_concreteness_score
                 })
 
             normalized_difficulty_data = self.calc_scores(difficulty_data)
