@@ -1,6 +1,7 @@
 import os
 import json
 import argparse
+import dataclasses
 
 from datatrove.executor import LocalPipelineExecutor, MpPipelineExecutor
 from datatrove.pipeline.cdf_gc import (
@@ -16,6 +17,7 @@ from datatrove.pipeline.cdf_gc import (
 from datatrove.pipeline.readers import JsonlReader
 from datatrove.pipeline.tokens import TokensCounter
 from datatrove.pipeline.writers.jsonl import JsonlWriter
+from datatrove.data import Document
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -46,6 +48,11 @@ def input_adapter(self, data: dict, path: str, id_in_file: int | str):
     }
 
 
+def output_adapter(self, document: Document) -> dict:
+    data = {key: val for key, val in dataclasses.asdict(document).items() if val}
+    return data
+
+
 def main():
     args = get_args()
     main_output_path = args.output_path
@@ -67,8 +74,8 @@ def main():
             JsonlReader(
                 data_folder=args.input_path,
                 glob_pattern=args.glob_pattern,
+                adapter=input_adapter,
                 limit=args.limit,
-                adapter=input_adapter
             ),
             DocumentDependencyParser(
                 language=args.language,
@@ -154,14 +161,15 @@ def main():
             JsonlReader(
                 data_folder=args.input_path,
                 glob_pattern=args.glob_pattern,
+                adapter=input_adapter,
                 limit=args.limit,
-                adapter=input_adapter
             ),
             ProbabilitySampler(
                 prob_folder=probability_path
             ),
             JsonlWriter(
                 output_folder=sample_result_path,
+                adapter=output_adapter,
                 compression=None
             ),
         ],
