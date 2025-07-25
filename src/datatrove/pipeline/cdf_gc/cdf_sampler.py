@@ -26,42 +26,19 @@ class ProbabilityCalculator(PipelineStep):
         self.gc_components = gc_components
         self.weights = weights
 
-    def get_min_max_values(self, world_size: int):
-        min_max_values_dict = {}
-        for gc_component in self.gc_components:
-            min_max_values_dict[gc_component] = [float("inf"), float("-inf")]
-        for rank in range(world_size):
-            input_file = self.input_folder.open(f"{rank:05d}.jsonl", mode="r")
-            for line in input_file:
-                item = json.loads(line)
-                for gc_component in self.gc_components:
-                    min_max_values_dict[gc_component][0] = min(min_max_values_dict[gc_component][0], item[gc_component])
-                    min_max_values_dict[gc_component][1] = max(min_max_values_dict[gc_component][1], item[gc_component])
-        return min_max_values_dict
-
     def run(self, data: DocumentsPipeline = None, rank: int = 0, world_size: int = 1):
         with self.track_time():
-            min_max_values_dict = self.get_min_max_values(world_size)
             world_size = len(self.input_folder.glob("*.jsonl"))
             gc_data = []
-            logger.info("Gathering GC scores from all tasks.")
             for rank in range(world_size):
                 input_file = self.input_folder.open(f"{rank:05d}.jsonl", mode="r")
                 for doc_id, line in enumerate(input_file):
                     item = json.loads(line)
-                    gc_score = 0
-                    for gc_component, weight in zip(self.gc_components, self.weights):
-                        min_value, max_value = min_max_values_dict[gc_component]
-                        if max_value != min_value:
-                            gc_score += (item[gc_component] - min_value) / (max_value - min_value) * weight
                     gc_data.append({
                         "rank": rank,
                         "doc_id": doc_id,
-                        "gc_score": gc_score,
                         "token_count": item["token_count"],
-                        "gc_component_values": {
-                            gc_component: item[gc_component] for gc_component in self.gc_components
-                        }
+                        "gc_score": sum(item["normalized_gc"][gc] * w for gc, w in zip(self.gc_components, self.weights))
                     })
             idxs = list(range(len(gc_data)))
             idxs.sort(key=lambda x: gc_data[x]["gc_score"])
@@ -80,7 +57,7 @@ class ProbabilityCalculator(PipelineStep):
                 hard_sample_idx = i
                 cur_hard_sample_tokens += gc_data[idxs[i]]["token_count"]
 
-            hard_sample_result = [{
+            hard_sample_probs = [{
                 **gc_data[i],
                 "prob": 1.0,
             } for i in idxs[hard_sample_idx:]] if hard_sample_idx < len(idxs) else []
@@ -95,25 +72,24 @@ class ProbabilityCalculator(PipelineStep):
 
             r = cdf_sample_tokens / base_expected_tokens if base_expected_tokens > 0 else 0
             logger.info(f"r={r}")
-            cdf_sample_result = []
+            cdf_sample_probs = []
             accumulated_tokens = 0
             for i in range(hard_sample_idx):
                 accumulated_tokens += gc_data[idxs[i]]["token_count"]
                 cdf = accumulated_tokens / total_tokens
-                cdf_sample_result.append({
+                cdf_sample_probs.append({
                     **gc_data[idxs[i]],
                     "prob": min(1, r * cdf),
                 })
 
-            sample_result = hard_sample_result + cdf_sample_result
-            sample_result.sort(key=lambda x: (x["rank"], x["doc_id"]))
+            prob_result = hard_sample_probs + cdf_sample_probs
+            prob_result.sort(key=lambda x: (x["rank"], x["doc_id"]))
             rank_dict = {rank: [] for rank in range(world_size)}
-            for item in sample_result:
+            for item in prob_result:
                 rank_dict[item["rank"]].append(item)
             for rank in rank_dict:
                 rank_dict[rank].sort(key=lambda x: x["doc_id"])
 
-            logger.info("Writing sampling probability files.")
             for rank, result in rank_dict.items():
                 output_file = self.output_folder.open(f"{rank:05d}.json", mode="w")
                 probs = [item["prob"] for item in result]
@@ -126,17 +102,24 @@ class ProbabilitySampler(PipelineStep):
     def __init__(
         self,
         prob_folder: DataFolderLike,
+        gc_folder: DataFolderLike,
         seed: int = 42,
     ):
         super().__init__()
         self.prob_folder = get_datafolder(prob_folder)
+        self.gc_folder = get_datafolder(gc_folder)
         random.seed(seed)
 
     def run(self, data: DocumentsPipeline = None, rank: int = 0, world_size: int = 1):
         with self.track_time():
             prob_file = self.prob_folder.open(f"{rank:05d}.json", mode="r")
             probs = json.load(prob_file)
-            for doc, prob in zip(data, probs):
+            gc_file = self.gc_folder.open(f"{rank:05d}.json", mode="r")
+            
+            for doc, prob, gc_line in zip(data, probs, gc_file):
                 rand_val = random.uniform(0, 1)
                 if rand_val <= prob:
+                    gc_item = json.load(gc_line)
+                    doc.metadata["org_gc"] = gc_item["org_gc"]
+                    doc.metadata["normalized_gc"] = gc_item["normalized_gc"]
                     yield doc

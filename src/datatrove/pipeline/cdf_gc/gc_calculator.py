@@ -30,7 +30,7 @@ def calc_counter_entropy(counter: Counter):
 
 class DocumentPartOfSpeechPredictor(PipelineStep):
     name = "Document Part of Speech Predictor"
-    _requires_dependencies = ["jieba", "nltk"]
+    type = "CDF-GC"
 
     def __init__(
         self,
@@ -59,7 +59,7 @@ class DocumentPartOfSpeechPredictor(PipelineStep):
 
 class LexicalDiversityCalculator(PipelineStep):
     name = "Lexical Diversity Calculator"
-    _requires_dependencies = ["jieba", "nltk"]
+    type = "CDF-GC"
 
     def __init__(
         self,
@@ -90,7 +90,7 @@ class LexicalDiversityCalculator(PipelineStep):
 
 class DocumentDependencyParser(PipelineStep):
     name = "Document Dependency Parser"
-    _requires_dependencies = ["ltp"]
+    type = "CDF-GC"
 
     def __init__(
         self,
@@ -116,10 +116,10 @@ class DocumentDependencyParser(PipelineStep):
                 local_rank = 0
             model = DependencyParser(self.language, local_rank % self.n_gpus, **self.kwargs)
             output_file = self.output_folder.open(f"{rank:05d}.jsonl", mode="w")
-            for doc_idx, doc in enumerate(data):
+            for doc_id, doc in enumerate(data):
                 parsed_sentences = model.predict(doc.text)
                 output_file.write(json.dumps({
-                    "doc_id": doc_idx,
+                    # "doc_id": doc_id,
                     "parsed_sentences": parsed_sentences
                 }, ensure_ascii=False) + "\n")
 
@@ -141,7 +141,7 @@ def calc_tree_height(parents: list[int]) -> int:
 
 class SyntacticComplexityCalculator(PipelineStep):
     name = "Syntactic Complexity Calculator"
-    _requires_dependencies = ["ltp", "torch"]
+    type = "CDF-GC"
 
     def __init__(
         self,
@@ -180,7 +180,7 @@ class SyntacticComplexityCalculator(PipelineStep):
                 avg_dep_dis = total_dependency_distance / total_edge_cnt
 
                 output_file.write(json.dumps({
-                    "doc_id": doc_id,
+                    # "doc_id": doc_id,
                     "dep_ent": dep_ent,
                     "avg_dep_height": avg_dep_height,
                     "avg_dep_dis": avg_dep_dis
@@ -189,6 +189,7 @@ class SyntacticComplexityCalculator(PipelineStep):
 
 class GcCombiner(PipelineStep):
     name = "GC Combiner"
+    type = "CDF-GC"
 
     def __init__(
         self,
@@ -229,8 +230,70 @@ class GcCombiner(PipelineStep):
             syntactic_complexity_items = syntactic_complexity_generator()
             for doc_id, (lexical_diversity_item, syntactic_complexity_item) in enumerate(zip(lexical_diversity_items, syntactic_complexity_items)):
                 output_file.write(json.dumps({
-                    "doc_id": doc_id,
+                    # "doc_id": doc_id,
                     **lexical_diversity_item,
                     **syntactic_complexity_item,
                 }) + "\n")
 
+
+class GcNormalizer(PipelineStep):
+    name = "GC Normalizer"
+    type = "CDF-GC"
+
+    def __init__(
+        self,
+        input_folder: DataFolderLike,
+        output_folder: DataFolderLike,
+        gc_components: list[str] = ["pos_ent", "con_ent", "dep_ent", "avg_dep_height", "avg_dep_dis"],
+    ):
+        super().__init__()
+        self.input_folder = get_datafolder(input_folder)
+        self.output_folder = get_datafolder(output_folder)
+        self.gc_components = gc_components
+
+    def run(self, data: DocumentsPipeline = None, rank: int = 0, world_size: int = 1):
+        with self.track_time():
+            world_size = len(self.input_folder.glob("*.jsonl"))
+
+            # gather all GC data and get min max dict
+            gc_data = []
+            min_max_values_dict = {}
+            for gc_component in self.gc_components:
+                min_max_values_dict[gc_component] = [float("inf"), float("-inf")]
+            for rank in range(world_size):
+                input_file = self.input_folder.open(f"{rank:05d}.jsonl", mode="r")
+                for line in input_file:
+                    item = json.loads(line)
+                    gc_data.append({
+                        "rank": rank,
+                        "doc_id": item["doc_id"],
+                        "token_count": item["token_count"],
+                        "org_gc": {
+                            gc_component: item[gc_component] for gc_component in self.gc_components
+                        }
+                    })
+                    for gc_component in self.gc_components:
+                        min_max_values_dict[gc_component][0] = min(min_max_values_dict[gc_component][0], item[gc_component])
+                        min_max_values_dict[gc_component][1] = max(min_max_values_dict[gc_component][1], item[gc_component])
+
+            # min-max normalize
+            for item in gc_data:
+                normalized_gc = {}
+                for gc_component in self.gc_components:
+                    min_value, max_value = min_max_values_dict[gc_component]
+                    val = 0
+                    if max_value != min_value:
+                        val = (item["org_gc"][gc_component] - min_value) / (max_value - min_value)
+                    normalized_gc[gc_component] = val
+                item["normalized_gc"] = normalized_gc
+
+            # write to output
+            gc_data.sort(key=lambda x: (x["rank"], x["doc_id"]))
+            rank_dict = {rank: [] for rank in range(world_size)}
+            for item in gc_data:
+                rank_dict[item["rank"]].append(item)
+            for rank, rank_data in rank_dict.items():
+                output_file = self.output_folder.open(f"{rank:05d}.jsonl", mode="w")
+                for item in rank_data:
+                    item.pop("rank")
+                    output_file.write(json.dumps(item) + "\n")

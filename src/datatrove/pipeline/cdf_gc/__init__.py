@@ -5,6 +5,7 @@ from .gc_calculator import (
     LexicalDiversityCalculator,
     DocumentDependencyParser,
     SyntacticComplexityCalculator,
-    GcCombiner
+    GcCombiner,
+    GcNormalizer
 )
 from .cdf_sampler import ProbabilityCalculator, ProbabilitySampler
