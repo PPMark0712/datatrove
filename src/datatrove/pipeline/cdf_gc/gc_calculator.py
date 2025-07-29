@@ -109,11 +109,7 @@ class DocumentDependencyParser(PipelineStep):
 
     def run(self, data: DocumentsPipeline, rank: int = 0, world_size: int = 1):
         with self.track_time():
-            identity = current_process()._identity
-            if identity:
-                local_rank = identity[0] - 1
-            else:
-                local_rank = 0
+            local_rank = self._local_rank
             model = DependencyParser(self.language, local_rank % self.n_gpus, **self.kwargs)
             output_file = self.output_folder.open(f"{rank:05d}.jsonl", mode="w")
             for doc_id, doc in enumerate(data):
@@ -262,11 +258,11 @@ class GcNormalizer(PipelineStep):
                 min_max_values_dict[gc_component] = [float("inf"), float("-inf")]
             for rank in range(world_size):
                 input_file = self.input_folder.open(f"{rank:05d}.jsonl", mode="r")
-                for line in input_file:
+                for doc_id, line in enumerate(input_file):
                     item = json.loads(line)
                     gc_data.append({
                         "rank": rank,
-                        "doc_id": item["doc_id"],
+                        "doc_id": doc_id,
                         "token_count": item["token_count"],
                         "org_gc": {
                             gc_component: item[gc_component] for gc_component in self.gc_components
@@ -296,4 +292,5 @@ class GcNormalizer(PipelineStep):
                 output_file = self.output_folder.open(f"{rank:05d}.jsonl", mode="w")
                 for item in rank_data:
                     item.pop("rank")
+                    item.pop("doc_id")
                     output_file.write(json.dumps(item) + "\n")

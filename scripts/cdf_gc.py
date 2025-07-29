@@ -1,9 +1,8 @@
 import os
-import json
 import argparse
 import dataclasses
 
-from datatrove.executor import LocalPipelineExecutor, MpPipelineExecutor
+from datatrove.executor import LocalPipelineExecutor
 from datatrove.pipeline.cdf_gc import (
     DocumentPartOfSpeechPredictor,
     LexicalDiversityCalculator,
@@ -43,8 +42,10 @@ def input_adapter(self, data: dict, path: str, id_in_file: int | str):
     return {
         "text": data.pop("text", ""),
         "id": data.pop("id", f"{path}/{id_in_file}"),
-        "metadata": {}
-        # "metadata": data,  # remaining data goes into metadata
+        "metadata": {
+            **data.pop("metadata", {}),
+            **data
+        },  # remaining data goes into metadata
     }
 
 
@@ -56,20 +57,20 @@ def output_adapter(self, document: Document) -> dict:
 def main():
     args = get_args()
     main_output_path = args.output_path
-    gc_path = os.path.join(main_output_path, "gc")
-    part_of_speech_predicting_path = os.path.join(gc_path, "part_of_speech_predicting")
-    lexical_diversity_path = os.path.join(gc_path, "lexical_diversity")
-    dependency_parsing_path = os.path.join(gc_path, "dependency_parsing")
-    syntactic_complexity_path = os.path.join(gc_path, "syntactic_complexity")
-    gc_result_path = os.path.join(gc_path, "result")
-    normalized_gc_path = os.path.join(gc_path, "normalized_gc")
-    sampling_path = os.path.join(main_output_path, "sampling")
-    probability_path = os.path.join(sampling_path, "probability")
-    sample_result_path = os.path.join(sampling_path, "sample_result")
+    gc_path = os.path.join(main_output_path, "1_gc_data")
+    dependency_parsing_path = os.path.join(gc_path, "1_dependency_parsing")
+    part_of_speech_predicting_path = os.path.join(gc_path, "2_part_of_speech_predicting")
+    lexical_diversity_path = os.path.join(gc_path, "3_lexical_diversity")
+    syntactic_complexity_path = os.path.join(gc_path, "4_syntactic_complexity")
+    gc_result_path = os.path.join(gc_path, "5_combined_gc")
+    normalized_gc_path = os.path.join(gc_path, "6_normalized_gc")
+    sampling_path = os.path.join(main_output_path, "2_sampling")
+    probability_path = os.path.join(sampling_path, "1_probability")
+    sample_result_path = os.path.join(sampling_path, "2_sample_result")
 
     log_path = os.path.join(main_output_path, "logs")
 
-    denpendency_parsing_excecutor = MpPipelineExecutor(
+    denpendency_parsing_excecutor = LocalPipelineExecutor(
         pipeline=[
             JsonlReader(
                 data_folder=args.input_path,
@@ -91,7 +92,7 @@ def main():
         logging_dir=os.path.join(log_path, "gc", "dependency_parsing"),
     )
     denpendency_parsing_excecutor.run()
-    
+
     part_of_speech_predicting_executor = LocalPipelineExecutor(
         pipeline=[
             JsonlReader(
@@ -151,7 +152,7 @@ def main():
         ],
         tasks=1,
         workers=1,
-        skip_completed=False,
+        skip_completed=not args.rerun,
         logging_dir=os.path.join(log_path, "sampling", "probability_calculator"),
     )
     sample_probability_calculator_executor.run()
@@ -165,7 +166,8 @@ def main():
                 limit=args.limit,
             ),
             ProbabilitySampler(
-                prob_folder=probability_path
+                prob_folder=probability_path,
+                gc_folder=normalized_gc_path
             ),
             JsonlWriter(
                 output_folder=sample_result_path,
@@ -175,7 +177,7 @@ def main():
         ],
         tasks=args.tasks,
         workers=args.workers,
-        skip_completed=False,
+        skip_completed=not args.rerun,
         logging_dir=os.path.join(log_path, "sampling", "sample_result"),
     )
     sample_executor.run()

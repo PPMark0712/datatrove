@@ -86,6 +86,7 @@ class PipelineExecutor(ABC):
             # pipe data from one step to the next
             pipelined_data = None
             for pipeline_step in self.pipeline:
+                pipeline_step._local_rank = local_rank
                 if callable(pipeline_step):
                     pipelined_data = pipeline_step(pipelined_data, rank, self.world_size)
                 elif isinstance(pipeline_step, Sequence) and not isinstance(pipeline_step, str):

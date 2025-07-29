@@ -114,12 +114,12 @@ class ProbabilitySampler(PipelineStep):
         with self.track_time():
             prob_file = self.prob_folder.open(f"{rank:05d}.json", mode="r")
             probs = json.load(prob_file)
-            gc_file = self.gc_folder.open(f"{rank:05d}.json", mode="r")
+            gc_file = self.gc_folder.open(f"{rank:05d}.jsonl", mode="r")
             
             for doc, prob, gc_line in zip(data, probs, gc_file):
                 rand_val = random.uniform(0, 1)
                 if rand_val <= prob:
-                    gc_item = json.load(gc_line)
+                    gc_item = json.loads(gc_line)
                     doc.metadata["org_gc"] = gc_item["org_gc"]
                     doc.metadata["normalized_gc"] = gc_item["normalized_gc"]
                     yield doc
