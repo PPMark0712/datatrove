@@ -1,4 +1,4 @@
-# HF_ENDPOINT="https://hf-mirror.com" python download_fineweb.py --output_path ...
+# HF_ENDPOINT="https://hf-mirror.com" python download_fineweb_edu.py --output_path ...
 import os
 import time
 import argparse
@@ -10,7 +10,7 @@ if __name__ == "__main__":
     # 创建参数解析器
     parser = argparse.ArgumentParser()
     parser.add_argument('--output_path', type=str, required=True)
-    parser.add_argument('--tasks', type=int, default=64)
+    parser.add_argument('--tasks', type=int, default=32)
     parser.add_argument('--workers', type=int, default=8)
     parser.add_argument('--limit', type=int, default=1000, help="line limit per task, -1 = download all")
     
@@ -25,7 +25,8 @@ if __name__ == "__main__":
     pipeline_exec = LocalPipelineExecutor(
         pipeline=[
             ParquetReader(
-                "hf://datasets/HuggingFaceFW/fineweb/data",
+                "hf://datasets/HuggingFaceFW/fineweb-edu",
+                glob_pattern="data/*/*.parquet",
                 limit=args.limit
             ),
             JsonlWriter(
@@ -46,4 +47,4 @@ if __name__ == "__main__":
                 break
         except Exception as e:
             print(e)
-            time.sleep(60)
+            time.sleep(10)
