@@ -71,7 +71,7 @@ class ProbabilityCalculator(PipelineStep):
                 base_expected_tokens += accumulated_tokens / total_tokens * gc_data[idxs[i]]["token_count"]
 
             r = cdf_sample_tokens / base_expected_tokens if base_expected_tokens > 0 else 0
-            logger.info(f"r={r}")
+            # logger.info(f"r={r}")
             cdf_sample_probs = []
             accumulated_tokens = 0
             for i in range(hard_sample_idx):

@@ -2,13 +2,13 @@ import math
 import json
 
 from collections import Counter
-from multiprocessing import current_process
 
 from datatrove.data import DocumentsPipeline
 from datatrove.pipeline.base import PipelineStep
 from datatrove.pipeline.cdf_gc import PartOfSpeechPredictor, DependencyParser
 from datatrove.utils.logging import logger
 from datatrove.io import DataFolderLike, get_datafolder
+
 
 def preprocess_text(text: str) -> str:
     new_lines = []

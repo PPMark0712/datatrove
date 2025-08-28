@@ -1,10 +1,9 @@
-import os
 from abc import ABC, abstractmethod
 from ltp import LTP
-from datatrove.utils.logging import logger
+
 
 def split_into_sentences(text: str, max_length: int, punctuations: str):
-    # 从头开始，每当遇到punctuations时，切分一个句子，如果到达max_length也要切分
+    # split a sentence whenever punctuation marks are encountered, or if max_length is reached
     sentences = []
     if not text:
         return []
@@ -29,6 +28,7 @@ class BaseDependencyParser(ABC):
     @abstractmethod
     def predict(self, text: str, rank: int):
         pass
+
 
 # class EnglishSyntacticComplexityPredictor(BaseSyntacticComplexityCalculator):
 

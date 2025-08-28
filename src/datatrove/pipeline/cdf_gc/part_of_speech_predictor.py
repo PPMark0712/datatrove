@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import nltk
 import jieba.posseg
 
+
 def is_alpha_word(word: str) -> bool:
     return any(c.isalpha() for c in word)
 
@@ -22,10 +23,10 @@ class EnglishPartOfSpeechPredictor(BasePartOfSpeechPredictor):
         if "nltk_data_path" in kwargs:
             nltk.data.path.append(kwargs["nltk_data_path"])
         self.content_words_pos_tags = [
-            'NN', 'NNS', 'NNP', 'NNPS',  # 名词
-            'VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ',  # 动词
-            'JJ', 'JJR', 'JJS',  # 形容词
-            'RB', 'RBR', 'RBS'  # 副词
+            'NN', 'NNS', 'NNP', 'NNPS',  # noun
+            'VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ',  # verb
+            'JJ', 'JJR', 'JJS',  # adj
+            'RB', 'RBR', 'RBS'  # adv
         ]
 
     def predict(self, text: str):
