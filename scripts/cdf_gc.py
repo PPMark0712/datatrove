@@ -29,7 +29,7 @@ def get_args():
     parser.add_argument("--language", type=str, default="zh", choices=["zh"])
     parser.add_argument("--tokenizer_path", type=str, required=True, help="path to tokenizer.json for counting tokens")
     parser.add_argument("--ltp_model_path", type=str, default=None, help="path to huggingface model: LTP/small")
-    parser.add_argument("--dependency_parsing_workers_per_gpu", type=int, default=1)
+    parser.add_argument("--workers_per_gpu", type=int, default=1)
     parser.add_argument("--limit", type=int, default=-1)
     parser.add_argument("--sample_rate", type=float, required=True)
     parser.add_argument("--rate_for_hard_sample", type=float, default=0.4)
@@ -82,12 +82,12 @@ def main():
                 language=args.language,
                 output_folder=dependency_parsing_path,
                 n_gpus=args.n_gpus,
-                workers_per_gpu=args.dependency_parsing_workers_per_gpu,
+                workers_per_gpu=args.workers_per_gpu,
                 ltp_model_path=args.ltp_model_path
             ),
         ],
         tasks=args.tasks,
-        workers=args.n_gpus * args.dependency_parsing_workers_per_gpu,
+        workers=args.n_gpus * args.workers_per_gpu,
         skip_completed=not args.rerun,
         logging_dir=os.path.join(log_path, "gc", "dependency_parsing"),
     )
