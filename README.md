@@ -33,7 +33,7 @@ pip install -e .[cdf_gc]
 ```
 The `.[cdf_gc]` part ensures that the specific dependencies for this project, as listed in the `pyproject.toml` file, are also installed.
 
-Download Pre-trained Models
+4. Download Pre-trained Models
 
 - LTP Model: Download the [LTP/small](https://huggingface.co/LTP/small) model from the Hugging Face Hub.
 
