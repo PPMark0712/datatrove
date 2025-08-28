@@ -1,10 +1,12 @@
 # CDF-GC
 
+Language: [English](README.md) | [Chinese](README-zh.md)
+
 This repository contains the code for the paper: "Data-Efficient Selection via Grammatical Complexity in Continual Pre-training of Domain-Specific LLMs".
 
 * **Paper Link**: To be updated.
 * **Supported Languages**: Currently, this tool only supports Chinese data selection. To extend it to other languages, you will need to modify `src/datatrove/pipeline/cdf_gc/dependency_parser.py` and `part_of_speech_predictor.py`.
-* **Note**: This project is built on top of the Hugging Face `datatrove` framework. This README provides information specific to this project and does not cover the `datatrove` framework itself.
+* **Note**: This project is built on top of the [huggingface/datatrove](https://github.com/huggingface/datatrove) framework. This README provides information specific to this project and does not cover the `datatrove` framework itself.
 
 ## Environment Setup
 

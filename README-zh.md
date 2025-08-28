@@ -1,13 +1,16 @@
 # CDF-GC
 
-这是论文《Data-Efficient Selection via Grammatical Complexity in Continual Pre-training of Domain-Specific LLMs》的代码实现。
+Language: [English](README.md) | [Chinese](README-zh.md)
+
+该项目是论文《Data-Efficient Selection via Grammatical Complexity in Continual Pre-training of Domain-Specific LLMs》的代码部分。
 
 * **论文链接**：暂未更新。
-* **支持语言**：目前仅支持中文数据筛选。如需扩展至其他语言，请修改 `src/datatrove/pipeline/cdf_gc/dependency_parser.py` 和 `part_of_speech_predictor.py`。
-* **注意**：本项目基于 Hugging Face `datatrove` 框架，本 README 仅包含本项目特有的信息，不包含 `datatrove` 框架本身的说明。
+* **支持语言**：目前仅支持中文数据筛选。如需扩展至其他语言，请扩展 `src/datatrove/pipeline/cdf_gc/dependency_parser.py` 和 `part_of_speech_predictor.py`。
+* **注意**：本项目基于 [huggingface/datatrove](https://github.com/huggingface/datatrove) 框架，该 README 仅包含本项目特有的信息，不包含 `datatrove` 框架本身的说明。
 
 ## 环境配置
-为了运行本项目，请先将 `datatrove` 库安装到您的 Python 环境中。具体的依赖项都列在了 `pyproject.toml` 文件里。
+
+为了运行本项目，请先将 `datatrove` 库安装到您的 Python 环境中。具体的依赖项见 `pyproject.toml` 文件。
 
 1、下载代码仓库
 ```bash
