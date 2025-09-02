@@ -1,27 +1,24 @@
 import os
 import json
-import math
-from collections import defaultdict
 
 import nltk
 from nltk.corpus import wordnet as wn
 from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize, sent_tokenize
+from nltk.tokenize import word_tokenize
 from nltk.tag import pos_tag
 from nltk.wsd import lesk
-from nltk.stem import WordNetLemmatizer
+
+# import wn
+# from pywsd.utils import lemmatize
+# from pywsd.similarity import sim
 
 from datatrove.io import DataFolderLike, get_datafolder
 from datatrove.data import DocumentsPipeline
 from datatrove.pipeline.base import PipelineStep
+from datatrove.utils.text import split_into_sentences
 from datatrove.utils.logging import logger
 
-def calc_counter_entropy(counter: dict):
-    total = sum(counter.values())
-    if total == 0:
-        return 0
-    return -sum((count / total) * math.log2(count / total) for count in counter.values())
-
+poss_to_calc = "NV"  # "JNVR"
 
 def get_wordnet_pos(nltk_pos_tag:str):
     d = {
@@ -33,25 +30,19 @@ def get_wordnet_pos(nltk_pos_tag:str):
     return d.get(nltk_pos_tag[0], None)
 
 
-def get_lemmatize_pos(nltk_pos_tag: str):
-    d = {
-        "N": "n",
-        "V": "v",
-        "J": "a",
-        "R": "r",
-    }
-    return d.get(nltk_pos_tag[0], "n")
-
-
-class LexicalDifficultySorter(PipelineStep):
-    name = "🔤 - Lexical difficulty sorter"
-    type = "cl"
+class HypernymDepthCalculator(PipelineStep):
+    name = "Hypernym depth calculator"
+    type = "Curriculum Learning"
 
     def __init__(
         self,
+        output_folder: DataFolderLike,
+        min_max_output_folder: DataFolderLike,
         **kwargs
     ):
         super().__init__()
+        self.output_folder = get_datafolder(output_folder)
+        self.min_max_output_folder = get_datafolder(min_max_output_folder)
         self.kwargs = kwargs
         self._check_nltk_dependencies()
         self.stop_words = set(stopwords.words("english"))
@@ -76,97 +67,102 @@ class LexicalDifficultySorter(PipelineStep):
     def is_valid_word(self, word: str) -> bool:
         return len(word) > 1 and any(c.isalpha() for c in word) and word not in self.stop_words
 
-    def calc_scores(self, difficulty_data: list):
-        """Normalize all difficulty dimensions using min-max scaling"""
-        dimensions = difficulty_data[0].keys()
-        min_vals = {dim: float('inf') for dim in dimensions}
-        max_vals = {dim: float('-inf') for dim in dimensions}
+    def calc_doc_hypernym_depth(self, text: str) -> dict:
+        pos_hypernym_depth_sum = {pos: 0 for pos in poss_to_calc}
+        pos_counter = {pos: 0 for pos in poss_to_calc}
+        words = word_tokenize(text)
+        words_with_pos = pos_tag(words)
+        window_r = 10
+        for i, (word, pos) in enumerate(words_with_pos):
+            pos = pos[0]
+            if pos not in poss_to_calc:
+                continue
+            context = words[max(0, i - window_r): min(len(words), i + window_r + 1)]
+            synset = lesk(context, word, get_wordnet_pos(pos))
+            # logger.debug(f"{word}, {pos}, {synset}")
+            if synset:
+                pos_counter[pos] += 1
+                pos_hypernym_depth_sum[pos] += synset.max_depth()
+        return {pos: pos_hypernym_depth_sum[pos] / pos_counter[pos] if pos_counter[pos] > 0 else 0 for pos in poss_to_calc}
 
-        for doc in difficulty_data:
-            for dim in dimensions:
-                if doc[dim] < min_vals[dim]:
-                    min_vals[dim] = doc[dim]
-                if doc[dim] > max_vals[dim]:
-                    max_vals[dim] = doc[dim]
+    def run(self, data: DocumentsPipeline, rank: int = 0, world_size: int = 1):
+        if "nltk_path" in self.kwargs:
+            nltk.data.path.append(self.kwargs["nltk_path"])
+        with self.track_time():
+            min_max_dict = {pos: (100, 0.0) for pos in poss_to_calc}
+            with self.output_folder.open(f"{rank:05d}.jsonl", mode="w") as output_fn:
+                for doc in data:
+                    result = self.calc_doc_hypernym_depth(doc.text)
+                    output_fn.write(json.dumps(result) + "\n")
+                    for pos, depth in result.items():
+                        min_v, max_v = min_max_dict[pos]
+                        min_max_dict[pos] = (min(min_v, depth), max(max_v, depth))
+            with self.min_max_output_folder.open(f"{rank:05d}.json", mode="w") as output_fn:
+                output_fn.write(json.dumps(min_max_dict))
 
-        normalized_data = []
-        for doc in difficulty_data:
-            normalized_doc = {}
-            for dim in dimensions:
-                if max_vals[dim] == min_vals[dim]:
-                    normalized_doc[dim] = 0.5
-                else:
-                    normalized_doc[dim] = (doc[dim] - min_vals[dim]) / (max_vals[dim] - min_vals[dim])
 
-            score = sum(normalized_doc.values()) / len(dimensions)
-            normalized_doc["difficulty_score"] = score
-            normalized_data.append(normalized_doc)
+class PosHypernymDepthNormalizer(PipelineStep):
+    name = "Pos hypernym depth normalizer"
+    type = "Curriculum Learning"
 
-        return normalized_data
+    def __init__(
+        self,
+        input_folder: DataFolderLike,
+        min_max_folder: DataFolderLike,
+        output_folder: DataFolderLike
+    ):
+        super().__init__()
+        self.input_folder = get_datafolder(input_folder)
+        self.min_max_folder = get_datafolder(min_max_folder)
+        self.output_folder = get_datafolder(output_folder)
 
     def run(self, data: DocumentsPipeline, rank: int = 0, world_size: int = 1):
         with self.track_time():
-            if "nltk_path" in self.kwargs:
-                nltk.data.path.append(self.kwargs["nltk_path"])
-            lemmatizer = WordNetLemmatizer()
-            difficulty_data = []
-            all_docs = []
-            # 需要用all_docs保存完整的文件，占用大量内存
-            for doc in data:
-                all_docs.append(doc)
-                text = doc.text
-                sentences = sent_tokenize(text)
-                total_valid_words = 0
-                sum_hypernym_depth = 0
-                sum_synonym_count = 0
-                sum_concreteness_score = 0
-                total_words_in_concreteness_dict = 0
-                hypernym_counter = defaultdict(int)
+            min_max_dict = {pos: (100, 0.0) for pos in poss_to_calc}
+            # gather min max
+            for i in range(world_size):
+                with self.min_max_folder.open(f"{i:05d}.json", mode="r") as f:
+                    rank_min_max_dict = json.load(f)
+                for pos, (rank_min_v, rank_max_v) in rank_min_max_dict.items():
+                    min_v, max_v = min_max_dict[pos]
+                    min_max_dict[pos] = (min(min_v, rank_min_v), max(max_v, rank_max_v))
+            # normalize
+            with self.input_folder.open(f"{rank:05d}.jsonl", mode="r") as input_fn, self.output_folder.open(f"{rank:05d}.jsonl", mode="w") as output_fn:
+                for line in input_fn:
+                    pos_hypernym_depth_dict = json.loads(line)
+                    for pos, depth in pos_hypernym_depth_dict.items():
+                        min_v, max_v = min_max_dict[pos]
+                        if min_v == max_v:
+                            pos_hypernym_depth_dict[pos] = 0
+                        else:    
+                            pos_hypernym_depth_dict[pos] = (depth - min_v) / (max_v - min_v)
+                    output_fn.write(json.dumps(pos_hypernym_depth_dict) + "\n")
 
-                for sentence in sentences:
-                    words = word_tokenize(sentence)
-                    words_with_pos = pos_tag(words)
-                    for word, pos in words_with_pos:
-                        if not self.is_valid_word(word):
-                            continue
-                        total_valid_words += 1
 
-                        synsets = wn.synsets(word)
-                        sum_synonym_count += len(synsets)
-                        wn_pos = get_wordnet_pos(pos)
-                        synset = lesk(words, word, pos=wn_pos)
-                        if synset is not None:
-                            path = synset.hypernym_paths()[0]
-                            # logger.info(f"{word}, {path}, {synset}")
-                            sum_hypernym_depth += len(path)
-                            for hypernym in path[-3:]:
-                                hypernym_counter[hypernym.name()] += 1                            
-                        else:
-                            # logger.info("lesk error")
-                            pass
+class WeightSorter(PipelineStep):
+    name = "Weight Sorter"
+    type = "Curriculum Learning"
 
-                        org_word = lemmatizer.lemmatize(word, get_lemmatize_pos(pos))
-                        concreteness_score = self.concrectness_dict.get(org_word, None)
-                        if concreteness_score is not None:
-                            sum_concreteness_score += concreteness_score
-                            total_words_in_concreteness_dict += 1
+    def __init__(
+        self,
+        normalized_hypernym_depth_folder: DataFolderLike,
+        pos_weight: dict = {"N": 0.6, "V": 0.4}
+    ):
+        super().__init__()
+        self.normalized_hypernym_depth_folder = get_datafolder(normalized_hypernym_depth_folder)
+        self.pos_weight = pos_weight
 
-                avg_hypernym_depth = sum_hypernym_depth / total_valid_words if total_valid_words else 0
-                avg_synonym_count = sum_synonym_count / total_valid_words if total_valid_words else 0
-                hypernym_entropy = calc_counter_entropy(hypernym_counter)
-                avg_concreteness_score = sum_concreteness_score / total_words_in_concreteness_dict if total_words_in_concreteness_dict else 0
-
-                difficulty_data.append({
-                    "avg_hypernym_depth": avg_hypernym_depth,
-                    # "synonym_richness": avg_synonym_count,
-                    # "sense_dispersion": hypernym_entropy,
-                    # "abstract_score": avg_concreteness_score
-                })
-
-            normalized_difficulty_data = self.calc_scores(difficulty_data)
-            for doc, normalized_difficulty, org_difficulty in zip(all_docs, normalized_difficulty_data, difficulty_data):
-                doc.metadata["difficulty"] = org_difficulty
-                doc.metadata["normalized_difficulty"] = normalized_difficulty
-            all_docs.sort(key=lambda x: x.metadata["normalized_difficulty"]["difficulty_score"])
-            for doc in all_docs:
-                yield doc
+    def run(self, data: DocumentsPipeline, rank: int = 0, world_size: int = 1):
+        all_docs = []
+        def weight_iter():
+            with self.normalized_hypernym_depth_folder.open(f"{rank:05d}.jsonl", mode="r") as f:
+                for line in f:
+                    hypernym_depth_dict = json.loads(line)
+                    yield hypernym_depth_dict, sum([hypernym_depth_dict[pos] * self.pos_weight[pos] for pos in poss_to_calc])
+        for doc, (hypernym_depth_dict, weight) in zip(data, weight_iter()):
+            doc.metadata["hypernym_depth"] = hypernym_depth_dict
+            doc.metadata["weight"] = weight
+            all_docs.append(doc)
+        all_docs.sort(key=lambda x: x.metadata["weight"])
+        for doc in all_docs:
+            yield doc
