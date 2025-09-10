@@ -33,8 +33,22 @@ def sigmoid(x):
     return 1 / (1 + math.exp(-x))
 
 
-def calc_freq_difficulty(log_freq, freq_scaling_factor=0.8, log_freq_center=10):
+
+def calc_freq_difficulty(log_freq, freq_scaling_factor=0.8, log_freq_center=math.log(2233306)):
     return 1 - sigmoid(freq_scaling_factor * (log_freq - log_freq_center))
+
+
+def power_mean(scores: list, alpha=1.5):
+    return sum([s ** alpha for s in scores]) ** (1 / alpha)
+
+
+def merge_score(scores: list, alpha=1.5, top_p=0.1, top_weight=0.7):
+    """merge list of one word difficulty into paragraph difficulty"""
+    scores.sort(reverse=True)
+    top_k = int(len(scores) * top_p)
+    top_k_scores = scores[:top_k]
+    other_scores = scores[top_k:]
+    return power_mean(top_k_scores, alpha) * top_weight + power_mean(other_scores, alpha) * (1 - top_weight)
 
 
 class LexicalDifficultyCalculator(PipelineStep):
@@ -44,17 +58,20 @@ class LexicalDifficultyCalculator(PipelineStep):
     def __init__(
         self,
         output_folder: DataFolderLike,
-        min_max_output_folder: DataFolderLike,
+        freq_scaling_factor=0.8,
+        freq_center_rate=0.001,
+        power_mean_alpha=1.5,
+        merge_top_p=0.1,
+        merge_top_weight=0.7,
         **kwargs
     ):
         super().__init__()
         self.output_folder = get_datafolder(output_folder)
-        self.min_max_output_folder = get_datafolder(min_max_output_folder)
         self.kwargs = kwargs
         self._check_nltk_dependencies()
         self.stop_words = set(stopwords.words("english"))
         
-        self.dis_to_difficlty = {
+        self.dis_to_difficulty = {
             0: 0.0,
             1: 0.3,
             2: 0.5,
@@ -63,18 +80,29 @@ class LexicalDifficultyCalculator(PipelineStep):
             5: 0.9
         }
         self.dis_to_basic = {}
-        dis_to_basic_path = ""
+        dis_to_basic_path = "/data1/yyz/projects/CurriculumLearning/build_dict/output/dict/dis_to_basic.txt"
         with open(dis_to_basic_path, "r") as f:
             for line in f:
                 synset_name, dis = line.strip().split(" ")
                 self.dis_to_basic[synset_name] = int(dis)
         
         self.word_log_freq = {}
-        word_freq_path = ""
+        word_freq_path = "/data1/yyz/projects/CurriculumLearning/build_dict/output/dict/word_count.txt"
         with open(word_freq_path, "r") as f:
             for line in f:
                 word, freq = line.strip().split(" ")
                 self.word_log_freq[word] = math.log(int(freq))
+
+        self.power_mean_alpha = power_mean_alpha
+        self.merge_top_p = merge_top_p
+        self.merge_top_weight = merge_top_weight
+        self.freq_scaling_factor = freq_scaling_factor
+
+        total_words = len(self.word_log_freq)
+        freqs = list(self.word_log_freq.values())  # already sorted (descending)
+        sigmoid_center_id = int(total_words * freq_center_rate)
+        self.log_freq_center = freqs[sigmoid_center_id]
+
 
     def _check_nltk_dependencies(self):
         if "nltk_path" in self.kwargs:
@@ -101,16 +129,6 @@ class LexicalDifficultyCalculator(PipelineStep):
             return False
         return True
 
-    def merge_score(self, scores: list, alpha=1.5, top_p=0.1, top_weight=0.7):
-        """merge list of one word difficulty into paragraph difficulty"""
-        def power_mean(scores: list, alpha=1.5):
-            return sum([s ** alpha for s in scores]) ** (1 / alpha)
-        scores.sort(reverse=True)
-        top_k = int(len(scores) * top_p)
-        top_k_scores = scores[:top_k]
-        other_scores = scores[top_k:]
-        return power_mean(top_k_scores, alpha) * top_weight + power_mean(other_scores, alpha) * (1 - top_weight)
-
     def calc_score(self, text: list) -> dict:
         words = word_tokenize(text)
         words_with_pos = pos_tag(words)
@@ -125,13 +143,13 @@ class LexicalDifficultyCalculator(PipelineStep):
                 context = words[max(0, i - window_r): min(len(words), i + window_r + 1)]
                 synset = lesk(context, word, pos=wn.NOUN)
                 # logger.debug(f"{word}, {pos}, {synset}")
-                if synset:
+                if synset and synset.name() in self.dis_to_basic:
                     concept_dis = self.dis_to_basic[synset.name()]
                 else:
                     concept_dis = 10
-                concept_difficulty = self.dis_to_diff.get(concept_dis, 1)
+                concept_difficulty = self.dis_to_difficulty.get(concept_dis, 1)
                 freq_difficulty = calc_freq_difficulty(self.word_log_freq.get(word, 0))
-                noun_scores.append(concept_difficulty * freq_difficulty)
+                noun_scores.append((concept_difficulty * freq_difficulty) ** 0.5)
             else:
                 freq_difficulty = calc_freq_difficulty(self.word_log_freq.get(word, 0))
                 non_noun_scores.append(freq_difficulty)
@@ -140,47 +158,16 @@ class LexicalDifficultyCalculator(PipelineStep):
     def run(self, data: DocumentsPipeline, rank: int = 0, world_size: int = 1):
         if "nltk_path" in self.kwargs:
             nltk.data.path.append(self.kwargs["nltk_path"])
-        with self.track_time(), self.output_folder.open(f"{rank:05d}.jsonl", mode="w") as f:
+        difficulty_list = []
+        with self.track_time():
             for doc in data:
                 noun_scores, non_noun_scores = self.calc_score(doc.text)
-
-
-class PosHypernymDepthNormalizer(PipelineStep):
-    name = "Pos hypernym depth normalizer"
-    type = "Curriculum Learning"
-
-    def __init__(
-        self,
-        input_folder: DataFolderLike,
-        min_max_folder: DataFolderLike,
-        output_folder: DataFolderLike
-    ):
-        super().__init__()
-        self.input_folder = get_datafolder(input_folder)
-        self.min_max_folder = get_datafolder(min_max_folder)
-        self.output_folder = get_datafolder(output_folder)
-
-    def run(self, data: DocumentsPipeline, rank: int = 0, world_size: int = 1):
-        with self.track_time():
-            min_max_dict = {pos: (100, 0.0) for pos in poss_to_calc}
-            # gather min max
-            for i in range(world_size):
-                with self.min_max_folder.open(f"{i:05d}.json", mode="r") as f:
-                    rank_min_max_dict = json.load(f)
-                for pos, (rank_min_v, rank_max_v) in rank_min_max_dict.items():
-                    min_v, max_v = min_max_dict[pos]
-                    min_max_dict[pos] = (min(min_v, rank_min_v), max(max_v, rank_max_v))
-            # normalize
-            with self.input_folder.open(f"{rank:05d}.jsonl", mode="r") as input_fn, self.output_folder.open(f"{rank:05d}.jsonl", mode="w") as output_fn:
-                for line in input_fn:
-                    pos_hypernym_depth_dict = json.loads(line)
-                    for pos, depth in pos_hypernym_depth_dict.items():
-                        min_v, max_v = min_max_dict[pos]
-                        if min_v == max_v:
-                            pos_hypernym_depth_dict[pos] = 0
-                        else:    
-                            pos_hypernym_depth_dict[pos] = (depth - min_v) / (max_v - min_v)
-                    output_fn.write(json.dumps(pos_hypernym_depth_dict) + "\n")
+                noun_difficulty = merge_score(noun_scores)
+                non_noun_difficulty = merge_score(non_noun_scores)
+                difficulty = 0.5 * noun_difficulty + 0.5 * non_noun_difficulty
+                difficulty_list.append(difficulty)
+        with self.output_folder.open(f"{rank:05d}.json", mode="w") as f:
+            json.dump(difficulty_list, f)
 
 
 class WeightSorter(PipelineStep):
@@ -189,24 +176,19 @@ class WeightSorter(PipelineStep):
 
     def __init__(
         self,
-        normalized_hypernym_depth_folder: DataFolderLike,
-        pos_weight: dict = {"N": 0.6, "V": 0.4}
+        difficulty_folder: DataFolderLike,
     ):
         super().__init__()
-        self.normalized_hypernym_depth_folder = get_datafolder(normalized_hypernym_depth_folder)
-        self.pos_weight = pos_weight
+        self.difficulty_folder = get_datafolder(difficulty_folder)
 
     def run(self, data: DocumentsPipeline, rank: int = 0, world_size: int = 1):
-        all_docs = []
-        def weight_iter():
-            with self.normalized_hypernym_depth_folder.open(f"{rank:05d}.jsonl", mode="r") as f:
-                for line in f:
-                    hypernym_depth_dict = json.loads(line)
-                    yield hypernym_depth_dict, sum([hypernym_depth_dict[pos] * self.pos_weight[pos] for pos in poss_to_calc])
-        for doc, (hypernym_depth_dict, weight) in zip(data, weight_iter()):
-            doc.metadata["hypernym_depth"] = hypernym_depth_dict
-            doc.metadata["weight"] = weight
-            all_docs.append(doc)
-        all_docs.sort(key=lambda x: x.metadata["weight"])
-        for doc in all_docs:
-            yield doc
+        with self.track_time():
+            all_docs = []
+            for doc in data:
+                all_docs.append(doc)
+            with self.difficulty_folder.open(f"{rank:05d}.json", "r") as f:
+                difficulty_list = json.load(f)
+            idxs = [i for i in range(len(difficulty_list))]
+            idxs.sort(key=lambda x: difficulty_list[x])
+            for idx in idxs:
+                yield all_docs[idx]
