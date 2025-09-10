@@ -1,5 +1,6 @@
 import os
 import json
+import math
 
 import nltk
 from nltk.corpus import wordnet as wn
@@ -18,8 +19,6 @@ from datatrove.pipeline.base import PipelineStep
 from datatrove.utils.text import split_into_sentences
 from datatrove.utils.logging import logger
 
-poss_to_calc = "NV"  # "JNVR"
-
 def get_wordnet_pos(nltk_pos_tag:str):
     d = {
         "J": wn.ADJ,
@@ -30,8 +29,16 @@ def get_wordnet_pos(nltk_pos_tag:str):
     return d.get(nltk_pos_tag[0], None)
 
 
-class HypernymDepthCalculator(PipelineStep):
-    name = "Hypernym depth calculator"
+def sigmoid(x):
+    return 1 / (1 + math.exp(-x))
+
+
+def calc_freq_difficulty(log_freq, freq_scaling_factor=0.8, log_freq_center=10):
+    return 1 - sigmoid(freq_scaling_factor * (log_freq - log_freq_center))
+
+
+class LexicalDifficultyCalculator(PipelineStep):
+    name = "Lexical Difficulty Calculator"
     type = "Curriculum Learning"
 
     def __init__(
@@ -46,8 +53,28 @@ class HypernymDepthCalculator(PipelineStep):
         self.kwargs = kwargs
         self._check_nltk_dependencies()
         self.stop_words = set(stopwords.words("english"))
-        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "concreteness_dict.json"), "r") as f:
-            self.concrectness_dict = json.load(f)
+        
+        self.dis_to_difficlty = {
+            0: 0.0,
+            1: 0.3,
+            2: 0.5,
+            3: 0.7,
+            4: 0.8,
+            5: 0.9
+        }
+        self.dis_to_basic = {}
+        dis_to_basic_path = ""
+        with open(dis_to_basic_path, "r") as f:
+            for line in f:
+                synset_name, dis = line.strip().split(" ")
+                self.dis_to_basic[synset_name] = int(dis)
+        
+        self.word_log_freq = {}
+        word_freq_path = ""
+        with open(word_freq_path, "r") as f:
+            for line in f:
+                word, freq = line.strip().split(" ")
+                self.word_log_freq[word] = math.log(int(freq))
 
     def _check_nltk_dependencies(self):
         if "nltk_path" in self.kwargs:
@@ -65,40 +92,57 @@ class HypernymDepthCalculator(PipelineStep):
                 nltk.download(package, download_dir=self.kwargs.get("nltk_path", None))
 
     def is_valid_word(self, word: str) -> bool:
-        return len(word) > 1 and any(c.isalpha() for c in word) and word not in self.stop_words
+        if len(word) <= 1:
+            return False
+        if word in self.stop_words:
+            return False
+        alpha_rate = sum(1 for c in word if c.isalpha()) / len(word)
+        if alpha_rate < 0.5:
+            return False
+        return True
 
-    def calc_doc_hypernym_depth(self, text: str) -> dict:
-        pos_hypernym_depth_sum = {pos: 0 for pos in poss_to_calc}
-        pos_counter = {pos: 0 for pos in poss_to_calc}
+    def merge_score(self, scores: list, alpha=1.5, top_p=0.1, top_weight=0.7):
+        """merge list of one word difficulty into paragraph difficulty"""
+        def power_mean(scores: list, alpha=1.5):
+            return sum([s ** alpha for s in scores]) ** (1 / alpha)
+        scores.sort(reverse=True)
+        top_k = int(len(scores) * top_p)
+        top_k_scores = scores[:top_k]
+        other_scores = scores[top_k:]
+        return power_mean(top_k_scores, alpha) * top_weight + power_mean(other_scores, alpha) * (1 - top_weight)
+
+    def calc_score(self, text: list) -> dict:
         words = word_tokenize(text)
         words_with_pos = pos_tag(words)
+        noun_scores = []
+        non_noun_scores = []
         window_r = 10
         for i, (word, pos) in enumerate(words_with_pos):
-            pos = pos[0]
-            if pos not in poss_to_calc:
+            if not self.is_valid_word(word):
                 continue
-            context = words[max(0, i - window_r): min(len(words), i + window_r + 1)]
-            synset = lesk(context, word, get_wordnet_pos(pos))
-            # logger.debug(f"{word}, {pos}, {synset}")
-            if synset:
-                pos_counter[pos] += 1
-                pos_hypernym_depth_sum[pos] += synset.max_depth()
-        return {pos: pos_hypernym_depth_sum[pos] / pos_counter[pos] if pos_counter[pos] > 0 else 0 for pos in poss_to_calc}
+            pos = pos[0]
+            if pos == "N":
+                context = words[max(0, i - window_r): min(len(words), i + window_r + 1)]
+                synset = lesk(context, word, pos=wn.NOUN)
+                # logger.debug(f"{word}, {pos}, {synset}")
+                if synset:
+                    concept_dis = self.dis_to_basic[synset.name()]
+                else:
+                    concept_dis = 10
+                concept_difficulty = self.dis_to_diff.get(concept_dis, 1)
+                freq_difficulty = calc_freq_difficulty(self.word_log_freq.get(word, 0))
+                noun_scores.append(concept_difficulty * freq_difficulty)
+            else:
+                freq_difficulty = calc_freq_difficulty(self.word_log_freq.get(word, 0))
+                non_noun_scores.append(freq_difficulty)
+        return noun_scores, non_noun_scores
 
     def run(self, data: DocumentsPipeline, rank: int = 0, world_size: int = 1):
         if "nltk_path" in self.kwargs:
             nltk.data.path.append(self.kwargs["nltk_path"])
-        with self.track_time():
-            min_max_dict = {pos: (100, 0.0) for pos in poss_to_calc}
-            with self.output_folder.open(f"{rank:05d}.jsonl", mode="w") as output_fn:
-                for doc in data:
-                    result = self.calc_doc_hypernym_depth(doc.text)
-                    output_fn.write(json.dumps(result) + "\n")
-                    for pos, depth in result.items():
-                        min_v, max_v = min_max_dict[pos]
-                        min_max_dict[pos] = (min(min_v, depth), max(max_v, depth))
-            with self.min_max_output_folder.open(f"{rank:05d}.json", mode="w") as output_fn:
-                output_fn.write(json.dumps(min_max_dict))
+        with self.track_time(), self.output_folder.open(f"{rank:05d}.jsonl", mode="w") as f:
+            for doc in data:
+                noun_scores, non_noun_scores = self.calc_score(doc.text)
 
 
 class PosHypernymDepthNormalizer(PipelineStep):
