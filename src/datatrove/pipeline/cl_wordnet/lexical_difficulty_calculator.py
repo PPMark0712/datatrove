@@ -1,7 +1,5 @@
-import os
 import json
 import math
-from tkinter import N
 
 import nltk
 from nltk.corpus import wordnet as wn
@@ -17,22 +15,11 @@ from nltk.wsd import lesk
 from datatrove.io import DataFolderLike, get_datafolder
 from datatrove.data import DocumentsPipeline
 from datatrove.pipeline.base import PipelineStep
-from datatrove.utils.text import split_into_sentences
 from datatrove.utils.logging import logger
-
-def get_wordnet_pos(nltk_pos_tag:str):
-    d = {
-        "J": wn.ADJ,
-        "V": wn.VERB,
-        "N": wn.NOUN,
-        "R": wn.ADV
-    }
-    return d.get(nltk_pos_tag[0], None)
 
 
 def sigmoid(x):
     return 1 / (1 + math.exp(-x))
-
 
 
 def calc_freq_difficulty(log_freq, freq_scaling_factor=0.8, log_freq_center=math.log(2233306)):
@@ -65,8 +52,8 @@ class LexicalDifficultyCalculator(PipelineStep):
         freq_center_rate=0.001,
         power_mean_alpha=1.5,
         merge_top_p=0.1,
-        merge_top_weight=0.5,
-        noun_weight=0.7,
+        merge_top_weight=0.6,
+        noun_weight=0.6,
         **kwargs
     ):
         super().__init__()
@@ -78,7 +65,7 @@ class LexicalDifficultyCalculator(PipelineStep):
         logger.info("building dict")
         self.stop_words = set(stopwords.words("english"))
 
-        logger.info("loading dis to basic")
+        # logger.info("loading dis to basic")
         self.dis_to_difficulty = {i: math.log(i + 1) / math.log(11) for i in range(11)}
         self.dis_to_basic = {}
         dis_to_basic_path = "/data1/yyz/projects/CurriculumLearning/build_dict/output/dict/dis_to_basic.txt"
@@ -87,7 +74,7 @@ class LexicalDifficultyCalculator(PipelineStep):
                 synset_name, dis = line.strip().split(" ")
                 self.dis_to_basic[synset_name] = int(dis)
 
-        logger.info("loading word freq")
+        # logger.info("loading word freq")
         self.word_log_freq = {}
         word_freq_path = "/data1/yyz/projects/CurriculumLearning/build_dict/output/dict/word_count.txt"
         with open(word_freq_path, "r") as f:
@@ -101,7 +88,7 @@ class LexicalDifficultyCalculator(PipelineStep):
         self.merge_top_weight = merge_top_weight
         self.noun_weight = noun_weight
 
-        logger.info("calculating freq center")
+        # logger.info("calculating freq center")
         total_words = len(self.word_log_freq)
         freqs = list(self.word_log_freq.values())  # already sorted (descending)
         sigmoid_center_id = int(total_words * freq_center_rate)
@@ -111,7 +98,6 @@ class LexicalDifficultyCalculator(PipelineStep):
     def _check_nltk_dependencies(self):
         if "nltk_path" in self.kwargs:
             nltk.data.path.append(self.kwargs["nltk_path"])
-        return
         nltk_dependencies = [
             "wordnet",
             "stopwords",
@@ -119,27 +105,25 @@ class LexicalDifficultyCalculator(PipelineStep):
             "averaged_perceptron_tagger_eng",
         ]
         for package in nltk_dependencies:
-            try:
-                nltk.data.find(package)
-            except:
-                nltk.download(package, download_dir=self.kwargs.get("nltk_path", None))
+            # logger.debug(f"checking {package}")
+            nltk.download(package, download_dir=self.kwargs.get("nltk_path", None))
 
     def is_valid_word(self, word: str) -> bool:
         if len(word) <= 1:
             return False
         if word in self.stop_words:
             return False
-        alpha_rate = sum(1 for c in word if c.isalpha()) / len(word)
-        if alpha_rate <= 0.7:
+        if not word.isalpha():
             return False
         return True
 
     def calc_score(self, text: list) -> dict:
         words = word_tokenize(text)
         words_with_pos = pos_tag(words)
+        # logger.debug(words_with_pos)
         noun_scores = []
         non_noun_scores = []
-        window_r = 10
+        # window_r = 10
         for i, (word, pos) in enumerate(words_with_pos):
             if not self.is_valid_word(word):
                 continue
@@ -157,6 +141,7 @@ class LexicalDifficultyCalculator(PipelineStep):
                 concept_difficulty = self.dis_to_difficulty[concept_dis]
                 freq_difficulty = calc_freq_difficulty(self.word_log_freq.get(word.lower(), 0))
                 score = (concept_difficulty * freq_difficulty) ** 0.5
+                # score = freq_difficulty
                 noun_scores.append((score, word))
             else:
                 freq_difficulty = calc_freq_difficulty(self.word_log_freq.get(word.lower(), 0))
@@ -173,13 +158,11 @@ class LexicalDifficultyCalculator(PipelineStep):
                 noun_scores_with_words, non_noun_scores_with_words = self.calc_score(doc.text)
                 noun_scores_with_words.sort(key=lambda x: x[0], reverse=True)
                 non_noun_scores_with_words.sort(key=lambda x: x[0], reverse=True)
-                logger.info(noun_scores_with_words)
-                logger.info(non_noun_scores_with_words)
+                # logger.debug(noun_scores_with_words)
+                # logger.debug(non_noun_scores_with_words)
 
                 noun_scores = [score for score, word in noun_scores_with_words]
                 non_noun_scores = [score for score, word in non_noun_scores_with_words]
-                # logger.info(noun_scores)
-                # logger.info(non_noun_scores)
                 noun_difficulty = merge_score(noun_scores)
                 non_noun_difficulty = merge_score(non_noun_scores)
                 difficulty = self.noun_weight * noun_difficulty + (1 - self.noun_weight) * non_noun_difficulty
@@ -208,7 +191,7 @@ class WeightSorter(PipelineStep):
                 difficulty_list = json.load(f)
             idxs = [i for i in range(len(difficulty_list))]
             idxs.sort(key=lambda x: difficulty_list[x])
-            logger.info(idxs)
+            # logger.debug(idxs)
             for idx in idxs:
                 all_docs[idx].metadata["lexical_difficulty"] = difficulty_list[idx]
                 yield all_docs[idx]
