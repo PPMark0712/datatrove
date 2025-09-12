@@ -1,6 +1,7 @@
 import os
 import argparse
-
+# import nltk
+# nltk.data.path.append("/data1/yyz/downloads/models/nltk_data")
 from datatrove.executor.local import LocalPipelineExecutor
 from datatrove.pipeline.readers import JsonlReader
 from datatrove.pipeline.cl_wordnet.lexical_difficulty_calculator import (
