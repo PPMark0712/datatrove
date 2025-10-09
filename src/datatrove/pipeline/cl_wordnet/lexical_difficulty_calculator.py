@@ -54,12 +54,13 @@ class LexicalDifficultyCalculator(PipelineStep):
         merge_top_p=0.1,
         merge_top_weight=0.6,
         noun_weight=0.6,
+        dis_to_basic_path = "/data1/yyz/projects/CurriculumLearning/build_dict/output/dict/dis_to_basic.txt",
+        word_freq_path = "/data1/yyz/projects/CurriculumLearning/build_dict/output/dict/word_count.txt",
         **kwargs
     ):
         super().__init__()
         self.output_folder = get_datafolder(output_folder)
         self.kwargs = kwargs
-        logger.info("checking nltk dependencies")
         self._check_nltk_dependencies()
 
         logger.info("building dict")
@@ -68,7 +69,7 @@ class LexicalDifficultyCalculator(PipelineStep):
         # logger.info("loading dis to basic")
         self.dis_to_difficulty = {i: math.log(i + 1) / math.log(11) for i in range(11)}
         self.dis_to_basic = {}
-        dis_to_basic_path = "/data1/yyz/projects/CurriculumLearning/build_dict/output/dict/dis_to_basic.txt"
+
         with open(dis_to_basic_path, "r") as f:
             for line in f:
                 synset_name, dis = line.strip().split(" ")
@@ -76,7 +77,7 @@ class LexicalDifficultyCalculator(PipelineStep):
 
         # logger.info("loading word freq")
         self.word_log_freq = {}
-        word_freq_path = "/data1/yyz/projects/CurriculumLearning/build_dict/output/dict/word_count.txt"
+
         with open(word_freq_path, "r") as f:
             for line in f:
                 word, freq = line.strip().split(" ")
@@ -98,6 +99,7 @@ class LexicalDifficultyCalculator(PipelineStep):
     def _check_nltk_dependencies(self):
         if "nltk_path" in self.kwargs:
             nltk.data.path.append(self.kwargs["nltk_path"])
+        # return
         nltk_dependencies = [
             "wordnet",
             "stopwords",
@@ -154,7 +156,9 @@ class LexicalDifficultyCalculator(PipelineStep):
             nltk.data.path.append(self.kwargs["nltk_path"])
         difficulty_list = []
         with self.track_time():
-            for doc in data:
+            for i, doc in enumerate(data):
+                if (i + 1) % 1000 == 0:
+                    logger.debug(f"processed {i + 1} docs")
                 noun_scores_with_words, non_noun_scores_with_words = self.calc_score(doc.text)
                 noun_scores_with_words.sort(key=lambda x: x[0], reverse=True)
                 non_noun_scores_with_words.sort(key=lambda x: x[0], reverse=True)
