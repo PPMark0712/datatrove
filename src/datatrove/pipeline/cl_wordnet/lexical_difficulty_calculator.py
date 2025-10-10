@@ -99,7 +99,7 @@ class LexicalDifficultyCalculator(PipelineStep):
     def _check_nltk_dependencies(self):
         if "nltk_path" in self.kwargs:
             nltk.data.path.append(self.kwargs["nltk_path"])
-        # return
+        return
         nltk_dependencies = [
             "wordnet",
             "stopwords",
