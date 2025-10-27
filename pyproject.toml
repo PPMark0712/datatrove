@@ -106,16 +106,23 @@ testing = [
   "moto[s3,server]",
   "spacy[ja]"
 ]
-all = [
-  "datatrove[quality]",
-  "datatrove[testing]",
-]
 cdf_gc = [
   "datatrove[io]",
   "datatrove[processing]",
   "ltp",
   "nltk",
   "jieba",
+]
+ppl = [
+  "datatrove[io]",
+  "datatrove[processing]",
+  "vllm"
+]
+all = [
+  "datatrove[quality]",
+  "datatrove[testing]",
+  "datatrove[cdf_gc]",
+  "datatrove[ppl]"
 ]
 dev = [
   "datatrove[all]"
