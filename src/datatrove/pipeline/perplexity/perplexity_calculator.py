@@ -28,16 +28,21 @@ class PerplexityCalculator(PipelineStep):
             gpu_start_idx = self.tensor_parallel_size * self._local_rank
             gpu_end_idx = self.tensor_parallel_size * (self._local_rank + 1)
             use_gpus = self.visible_gpus[gpu_start_idx: gpu_end_idx]
-            ppl_model = PPLModel(
-                self.model_path,
-                self.tensor_parallel_size,
-                use_gpu_ids=use_gpus,
-            )
-            all_docs = [doc for doc in data]
-            texts = [doc.text for doc in all_docs]
-            ppls = ppl_model.calc_ppl(texts)
-            with self.output_folder.open(f"{rank:05d}.json", mode="w") as f:
-                json.dump(ppl_data, f)
-            for doc, ppl in zip(all_docs, ppls):
-                doc.metadata["ppl"] = ppl
-                yield doc
+            logger.info(f"process {self._local_rank} using GPUs {use_gpus} for Perplexity Calculator")
+            try:
+                ppl_model = PPLModel(
+                    self.model_path,
+                    self.tensor_parallel_size,
+                    use_gpu_ids=use_gpus,
+                )
+                all_docs = [doc for doc in data]
+                texts = [doc.text for doc in all_docs]
+                ppls = ppl_model.calc_ppl(texts)
+                with self.output_folder.open(f"{rank:05d}.json", mode="w") as f:
+                    json.dump(ppls, f)
+                for doc, ppl in zip(all_docs, ppls):
+                    doc.metadata["perplexity"] = ppl
+                    yield doc
+            except Exception as e:
+                logger.error(e)
+                del ppl_model  # ensure GPU is released
