@@ -54,8 +54,8 @@ class LexicalDifficultyCalculator(PipelineStep):
         merge_top_p=0.1,
         merge_top_weight=0.6,
         noun_weight=0.6,
-        dis_to_basic_path = "/data1/yyz/projects/CurriculumLearning/build_dict/output/dict/dis_to_basic.txt",
-        word_freq_path = "/data1/yyz/projects/CurriculumLearning/build_dict/output/dict/word_count.txt",
+        dis_to_basic_path = "/mnt/data/kw/yyz/projects/CurriculumLearning/build_dict/output/dict/dis_to_basic.txt",
+        word_freq_path = "/mnt/data/kw/yyz/projects/CurriculumLearning/build_dict/output/dict/word_count.txt",
         **kwargs
     ):
         super().__init__()

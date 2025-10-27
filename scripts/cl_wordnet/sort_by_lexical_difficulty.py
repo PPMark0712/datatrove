@@ -40,7 +40,7 @@ def main():
             ),
             LexicalDifficultyCalculator(
                 output_folder=difficulty_path,
-                nltk_path="/data1/yyz/downloads/models/nltk_data"
+                # nltk_path="/data1/yyz/downloads/models/nltk_data"
             ),
         ],
         tasks=args.tasks,
