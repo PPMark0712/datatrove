@@ -3,23 +3,24 @@ import math
 from vllm import LLM, SamplingParams
 from datatrove.utils.logging import logger
 
+
 class PPLModel:
     def __init__(self, model_path, tensor_parallel_size=1, use_gpu_ids=[0]):
         os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(list(map(str, use_gpu_ids)))
         self.model = LLM(
             model=model_path,
             tensor_parallel_size=tensor_parallel_size,
-            gpu_memory_utilization=0.85,
+            gpu_memory_utilization=0.85,  # decrease if OOM
         )
         self.sampling_params = SamplingParams(
             temperature=0,
             max_tokens=1,
             prompt_logprobs=0
         )
-    
-    def calc_ppl(self, texts):
+
+    def calc_ppl(self, inputs):
         outputs = self.model.generate(
-            texts,
+            inputs,
             sampling_params=self.sampling_params
         )
         ppls = []
