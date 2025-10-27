@@ -110,6 +110,13 @@ all = [
   "datatrove[quality]",
   "datatrove[testing]",
 ]
+cdf_gc = [
+  "datatrove[io]",
+  "datatrove[processing]",
+  "ltp",
+  "nltk",
+  "jieba",
+]
 dev = [
   "datatrove[all]"
 ]
