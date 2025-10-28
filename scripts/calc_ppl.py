@@ -6,9 +6,8 @@ import argparse
 import dataclasses
 
 from datatrove.executor import LocalPipelineExecutor
-from datatrove.pipeline.perplexity import Encoder, PerplexityCalculator, PPLModel
+from datatrove.pipeline.perplexity import Encoder, PerplexityCalculator
 from datatrove.pipeline.readers import JsonlReader
-from datatrove.pipeline.tokens import TokensCounter
 from datatrove.pipeline.writers.jsonl import JsonlWriter
 from datatrove.data import Document
 
