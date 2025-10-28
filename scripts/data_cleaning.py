@@ -1,5 +1,6 @@
 import os
 import argparse
+import dataclasses
 from functools import partial
 
 from datatrove.executor.local import LocalPipelineExecutor
