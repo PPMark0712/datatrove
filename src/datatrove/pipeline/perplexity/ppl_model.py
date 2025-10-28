@@ -16,10 +16,10 @@ class PPLModel:
             max_tokens=1,
             prompt_logprobs=0
         )
-    
-    def calc_ppl(self, texts):
+
+    def calc_ppl(self, inputs):
         outputs = self.model.generate(
-            texts,
+            inputs,
             sampling_params=self.sampling_params
         )
         ppls = []

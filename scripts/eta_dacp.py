@@ -87,6 +87,7 @@ def main():
             HardSampler(
                 score_folder=pos_ent_path,
                 top_p=args.sample_rate,
+                unit="token" if args.tokenizer_path is not None else "doc",
             ),
             JsonlWriter(
                 output_folder=result_path,
