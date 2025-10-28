@@ -20,10 +20,12 @@ Local, remote and other file systems are supported through [fsspec](https://file
 - [Executors](#executors)
   * [LocalPipelineExecutor](#localpipelineexecutor)
   * [SlurmPipelineExecutor](#slurmpipelineexecutor)
+  * [RayPipelineExecutor](#raypipelineexecutor)
 - [Logging](#logging)
 - [DataFolder / paths](#datafolder--paths)
 - [Practical guides](#practical-guides)
   * [Reading data](#reading-data)
+  * [Synthetic data generatioon](#synthetic-data-generation)
   * [Extracting text](#extracting-text)
   * [Filtering data](#filtering-data)
   * [Saving data](#saving-data)
@@ -49,6 +51,7 @@ Available flavours (combine them with `,` i.e. `[processing,s3]`):
 - `processing` dependencies for text extraction, filtering and tokenization: `pip install datatrove[processing]`
 - `s3` s3 support: `pip install datatrove[s3]`
 - `cli` for command line tools: `pip install datatrove[cli]`
+- `ray` for distributed compute engine: `pip install datatrove[ray]`
 
 ## Quickstart examples
 You can check the following [examples](examples):
@@ -226,6 +229,38 @@ executor2.run() # this will actually launch executor1, as it is a dependency, so
 ```
 </details>
 
+### RayPipelineExecutor
+This executor will launch a pipeline on a ray cluster, using ray tasks for parallel execution.
+Options:
+- `tasks` total number of tasks to run.
+- `workers` how many tasks to run simultaneously. If `-1`, no limit. Ray will run `workers` tasks at a time. (default: `-1`)
+- `depends` another RayPipelineExecutor instance, which will be a dependency of this pipeline (current pipeline will only start executing after the depended on pipeline successfully completes)
+<details>
+  <summary>Other options</summary>
+
+- `cpus_per_task` how many cpus to give each task (default: `1`)
+- `mem_per_cpu_gb` memory per cpu, in GB (default: 2)
+- `ray_remote_kwargs` Additional kwargs to pass to the ray.remote decorator
+</details>
+<details>
+  <summary>Example executor</summary>
+
+```python
+import ray
+from datatrove.executor import RayPipelineExecutor
+ray.init()
+executor = RayPipelineExecutor(
+    pipeline=[
+        ...
+    ],
+    logging_dir="logs/",
+    tasks=500,
+    workers=100,  # omit to run all at once
+)
+executor.run()
+```
+</details>
+
 ## Logging
 For a pipeline with `logging_dir` **mylogspath/exp1**, the following folder structure would be created:
 
@@ -285,6 +320,15 @@ Some options common to most readers:
 - `adapter` this function takes the raw dictionary obtained from the reader and returns a dictionary with `Document`'s field names. You may overwrite this function ([_default_adapter](src/datatrove/pipeline/readers/base.py)) if you would like.
 - `limit` read only a certain number of samples. Useful for testing/debugging
 
+### Synthetic data generation
+We support [vLLM](https://github.com/vllm-project/vllm) and [SGLang](https://github.com/sgl-project/sglang) for inference using the [InferenceRunner block](src/datatrove/pipeline/inference/run_inference.py). Each datatrove task will spawn a replica of the target model and full asynchronous continuous batching will guarantee high model throughput.
+
+By setting `checkpoints_local_dir` and `records_per_chunk` generations will be written to a local folder until a chunk is complete, allowing for checkpointing in case tasks fail or are preempted.
+
+Tune `max_concurrent_requests` to tune batching behaviour. If you have slow pre-processing, you can also increase `max_concurrent_tasks` (to a value higher than `max_concurrent_requests`). 
+
+Refer to the [example](examples/inference_example_chunked.py) for more info.
+
 ### Extracting text
 You can use [extractors](src/datatrove/pipeline/extractors) to extract text content from raw html. The most commonly used extractor in datatrove is [Trafilatura](src/datatrove/pipeline/extractors/trafilatura.py), which uses the [trafilatura](https://trafilatura.readthedocs.io/en/latest/) library.
 
@@ -314,7 +358,7 @@ For deduplication check the examples [minhash_deduplication.py](examples/minhash
 For summary statistics on your data you can use the [Stats](src/datatrove/pipeline/stats/summary_stats/) blocks. These blocks provide an easy way to collect data-profiles on your dataset in a distributed manner. It's a two step process in which you first:
 1) For each shard iterate over documents and collect stats into of the following groupings `summary` (all docs counted to "summary" key), `fqdn` (fully qualified domain name grouping), `suffix` (the last part of the url path grouping) or `histogram` (value based grouping).
 2) Merge the stats from different shards into a single file.
-See the [summary_stats.py](examples/summarty_stats.py) for more details.
+See the [summary_stats.py](examples/summary_stats.py) for more details.
 
 Each resulting stat is saved in a separate file with following structure: `output_folder/{fqdn,suffix,summary,histogram}/{stat_name}/metric.json`
 
