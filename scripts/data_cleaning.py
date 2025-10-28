@@ -1,5 +1,4 @@
 import os
-import json
 import argparse
 from functools import partial
 
@@ -19,6 +18,23 @@ from datatrove.pipeline.readers import JsonlReader
 from datatrove.pipeline.tokens import TokensCounter
 from datatrove.pipeline.writers.jsonl import JsonlWriter
 from datatrove.utils.hashing import HashConfig
+from datatrove.data import Document
+
+
+def input_adapter(self, data: dict, path: str, id_in_file: int | str):
+    return {
+        "text": data.pop("text", ""),
+        "id": data.pop("id", f"{path}/{id_in_file}"),
+        "metadata": {
+            **data.pop("metadata", {}),
+            **data
+        },  # remaining data goes into metadata
+    }
+
+
+def output_adapter(self, document: Document) -> dict:
+    data = {key: val for key, val in dataclasses.asdict(document).items() if val}
+    return data
 
 
 def get_args():
