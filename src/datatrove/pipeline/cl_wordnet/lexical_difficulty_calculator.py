@@ -193,7 +193,7 @@ class WeightSorter(PipelineStep):
                 all_docs.append(doc)
             with self.difficulty_folder.open(f"{rank:05d}.json", "r") as f:
                 difficulty_list = json.load(f)
-            idxs = [i for i in range(len(difficulty_list))]
+            idxs = list(range(len(difficulty_list)))
             idxs.sort(key=lambda x: difficulty_list[x])
             # logger.debug(idxs)
             for idx in idxs:

@@ -1,5 +1,6 @@
 import os
 import argparse
+import dataclasses
 # import nltk
 # nltk.data.path.append("/data1/yyz/downloads/models/nltk_data")
 from datatrove.executor.local import LocalPipelineExecutor
@@ -9,6 +10,27 @@ from datatrove.pipeline.cl_wordnet.lexical_difficulty_calculator import (
     WeightSorter
 )
 from datatrove.pipeline.writers.jsonl import JsonlWriter
+from datatrove.data import Document
+
+
+def input_adapter(self, data: dict, path: str, id_in_file: int | str):
+    text = data["question"] + "\n"
+    for option in data["options"].values():
+        text += option + "\n"
+    print(text)
+    return {
+        "text": text,
+        "id": data.pop("id", f"{path}/{id_in_file}"),
+        "metadata": {
+            **data.pop("metadata", {}),
+            **data
+        },
+    }
+
+
+def output_adapter(self, document: Document) -> dict:
+    data = {key: val for key, val in dataclasses.asdict(document).items() if val}
+    return data
 
 
 def get_args():
@@ -36,6 +58,7 @@ def main():
             JsonlReader(
                 data_folder=args.input_path,
                 glob_pattern=args.glob_pattern,
+                adapter=input_adapter,
                 limit=args.limit,
             ),
             LexicalDifficultyCalculator(
@@ -55,6 +78,7 @@ def main():
             JsonlReader(
                 data_folder=args.input_path,
                 glob_pattern=args.glob_pattern,
+                adapter=input_adapter,
                 limit=args.limit,
             ),
             WeightSorter(
@@ -62,6 +86,7 @@ def main():
             ),
             JsonlWriter(
                 output_folder=result_path,
+                adapter=output_adapter,
                 compression=None
             )
         ],
