@@ -39,9 +39,9 @@ def output_adapter(self, document: Document) -> dict:
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input_path", type=str, default="/data1/yyz/downloads/datasets/FinCorpus/processed")
+    parser.add_argument("--input_path", type=str, required=True)
     parser.add_argument("--glob_pattern", type=str, default=None)
-    parser.add_argument("--output_path", type=str, default="/data1/yyz/projects/data/datatrove_output/debug")
+    parser.add_argument("--output_path", type=str, required=True)
     parser.add_argument("--rerun", action="store_true")
     parser.add_argument("--tasks", type=int, default=64)
     parser.add_argument("--workers", type=int, default=32)
