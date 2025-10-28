@@ -21,20 +21,34 @@ from datatrove.utils.hashing import HashConfig
 from datatrove.data import Document
 
 
-def input_adapter(self, data: dict, path: str, id_in_file: int | str):
+def raw_input_adapter(self, data: dict, path: str, id_in_file: int | str):
+    # Adapts raw input data to the internal initial format
     return {
         "text": data.pop("text", ""),
         "id": data.pop("id", f"{path}/{id_in_file}"),
         "metadata": {
             **data.pop("metadata", {}),
             **data
-        },  # remaining data goes into metadata
+        },
     }
 
 
 def output_adapter(self, document: Document) -> dict:
+    # Converts internal Document object to a unified output format
     data = {key: val for key, val in dataclasses.asdict(document).items() if val}
     return data
+
+
+def processed_input_adapter(self, data: dict, path: str, id_in_file: int | str):
+    # Adapts processed output-format data back to the internal format
+    return {
+        "text": data.pop("text", ""),
+        "id": data.pop("id", f"{path}/{id_in_file}"),
+        "metadata": {
+            **data.pop("metadata", {}),
+            **data
+        },
+    }
 
 
 def get_args():
@@ -76,12 +90,14 @@ def main():
             JsonlReader(
                 args.input_path,
                 glob_pattern=args.glob_pattern,
+                adapter=raw_input_adapter,
                 limit=args.limit,
             ),
             LanguageFilter(
                 languages=args.languages,
                 exclusion_writer=JsonlWriter(
                     os.path.join(LANGUAGE_FILTER_REMOVE_PATH, "1_other_languages"),
+                    adapter=output_adapter,
                     compression=None
                 )
             ),
@@ -89,12 +105,14 @@ def main():
                 filter_function=partial(above_language_threshold, language_threshold=0.65),
                 exclusion_writer=JsonlWriter(
                     os.path.join(LANGUAGE_FILTER_REMOVE_PATH, "2_below_language_score_threshold"),
+                    adapter=output_adapter,
                     compression=None
                 )
             ),
             JsonlWriter(
                 LANGUAGE_FILTER_OUTPUT_PATH,
                 output_filename="${language}/${rank}.jsonl",
+                adapter=output_adapter,
                 compression=None,
             )
         ],
@@ -118,7 +136,8 @@ def main():
         quality_filter_executor = LocalPipelineExecutor(
             pipeline=[         
                 JsonlReader(
-                    os.path.join(LANGUAGE_FILTER_OUTPUT_PATH, language)
+                    os.path.join(LANGUAGE_FILTER_OUTPUT_PATH, language),
+                    adapter=processed_input_adapter,
                 ),
                 GopherRepetitionFilter(
                     language=language,
@@ -127,6 +146,7 @@ def main():
                     exclusion_writer=JsonlWriter(
                         os.path.join(QUALITY_FILTERING_REMOVE_PATH, "1_gopher_repetition_filter"),
                         output_filename="${filter_reason}/${rank}.jsonl",
+                        adapter=output_adapter,
                         compression=None
                     )
                 ),
@@ -139,6 +159,7 @@ def main():
                     exclusion_writer=JsonlWriter(
                         os.path.join(QUALITY_FILTERING_REMOVE_PATH, "2_gopher_quality_filter"),
                         output_filename="${filter_reason}/${rank}.jsonl",
+                        adapter=output_adapter,
                         compression=None
                     )
                 ),
@@ -147,11 +168,13 @@ def main():
                     exclusion_writer=JsonlWriter(
                         os.path.join(QUALITY_FILTERING_REMOVE_PATH, "4_fineweb_quality_filter"),
                         output_filename="${filter_reason}/${rank}.jsonl",
+                        adapter=output_adapter,
                         compression=None
                     )
                 ),
                 JsonlWriter(
                     QUALITY_FILTERING_OUTPUT_PATH,
+                    adapter=output_adapter,
                     compression=None
                 )
             ],
@@ -166,6 +189,7 @@ def main():
         ==============================
         3. minhash deduplication
         ==============================
+        Note: High memory usage; potential bugs.
         """
         MINHASH_SIGNATURE_PATH = os.path.join(MINHASH_PATH, language, "1_signatures")
         MINHASH_BUCKETS_PATH = os.path.join(MINHASH_PATH, language, "2_buckets")
@@ -183,7 +207,8 @@ def main():
         )
 
         MINHASH_INPUT_READER = JsonlReader(
-            QUALITY_FILTERING_OUTPUT_PATH
+            QUALITY_FILTERING_OUTPUT_PATH,
+            adapter=processed_input_adapter,
         )
 
         minhash_signature_executor = LocalPipelineExecutor(
@@ -238,12 +263,14 @@ def main():
                     input_folder=MINHASH_REMOVE_IDS_PATH,
                     exclusion_writer=JsonlWriter(
                         os.path.join(MINHASH_RESULT_PATH, "removed"),
+                        adapter=output_adapter,
                         compression=None
                     )
                 ),
                 PIIFormatter(),
                 JsonlWriter(
                     os.path.join(MINHASH_RESULT_PATH, "output"),
+                    adapter=output_adapter,
                     compression=None
                 )
             ],
