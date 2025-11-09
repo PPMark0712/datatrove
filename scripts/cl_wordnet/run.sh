@@ -6,8 +6,8 @@
     # --rerun
 
 python sort_by_lexical_difficulty.py \
-    --input_path /mnt/data/kw/yyz/downloads/datasets/Henrychur/MMedBench/Test/English.jsonl \
-    --output_path /mnt/data/kw/yyz/data/datatrove_output/MMedBench_en_wordnet \
-    --tasks 1 \
-    --workers 1 \
+    --input_path /mnt/data/kw/yyz/downloads/datasets/CMB_AILab/YiZhao-FinDataSet/en \
+    --output_path /mnt/data/kw/yyz/data/datatrove_output/FinDataSet_wordnet \
+    --tasks 20 \
+    --workers 20 \
     --rerun

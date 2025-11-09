@@ -14,15 +14,16 @@ from datatrove.data import Document
 
 
 def input_adapter(self, data: dict, path: str, id_in_file: int | str):
-    text = data["question"] + "\n"
-    for option in data["options"].values():
-        text += option + "\n"
-    print(text)
+    # text = data["question"] + "\n"
+    # for option in data["options"].values():
+    #     text += option + "\n"
+    # print(text)
+    text = data["text"]
     return {
         "text": text,
         "id": data.pop("id", f"{path}/{id_in_file}"),
         "metadata": {
-            **data.pop("metadata", {}),
+            **data.pop("meta", {}),
             **data
         },
     }
@@ -73,29 +74,29 @@ def main():
     )
     executor.run()
 
-    sorter_executor = LocalPipelineExecutor(
-        pipeline=[
-            JsonlReader(
-                data_folder=args.input_path,
-                glob_pattern=args.glob_pattern,
-                adapter=input_adapter,
-                limit=args.limit,
-            ),
-            WeightSorter(
-                difficulty_folder=difficulty_path,
-            ),
-            JsonlWriter(
-                output_folder=result_path,
-                adapter=output_adapter,
-                compression=None
-            )
-        ],
-        tasks=args.tasks,
-        workers=args.workers,
-        logging_dir=os.path.join(LOG_PATH, "2_sort_by_lexical_difficulty"),
-        skip_completed=not args.rerun
-    )
-    sorter_executor.run()
+    # sorter_executor = LocalPipelineExecutor(
+    #     pipeline=[
+    #         JsonlReader(
+    #             data_folder=args.input_path,
+    #             glob_pattern=args.glob_pattern,
+    #             adapter=input_adapter,
+    #             limit=args.limit,
+    #         ),
+    #         WeightSorter(
+    #             difficulty_folder=difficulty_path,
+    #         ),
+    #         JsonlWriter(
+    #             output_folder=result_path,
+    #             adapter=output_adapter,
+    #             compression=None
+    #         )
+    #     ],
+    #     tasks=args.tasks,
+    #     workers=args.workers,
+    #     logging_dir=os.path.join(LOG_PATH, "2_sort_by_lexical_difficulty"),
+    #     skip_completed=not args.rerun
+    # )
+    # sorter_executor.run()
 
 
 if __name__ == "__main__":

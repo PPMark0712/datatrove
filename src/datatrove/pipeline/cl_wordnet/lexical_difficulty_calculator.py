@@ -139,7 +139,7 @@ class LexicalDifficultyCalculator(PipelineStep):
                 if synset and synset.name() in self.dis_to_basic:
                     concept_dis = self.dis_to_basic[synset.name()]
                 else:
-                    concept_dis = 3
+                    concept_dis = 10
                 concept_difficulty = self.dis_to_difficulty[concept_dis]
                 freq_difficulty = calc_freq_difficulty(self.word_log_freq.get(word.lower(), 0))
                 score = (concept_difficulty * freq_difficulty) ** 0.5
