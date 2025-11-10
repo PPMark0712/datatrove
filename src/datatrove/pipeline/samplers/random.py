@@ -6,10 +6,9 @@ from .base import BaseSampler
 from .utils import read_score_file
 
 
-class Counter(PipelineStep):
+class DocumentCounter(PipelineStep):
     """Count the number of documents in the pipeline."""
-    type = "Counter"
-    name = "Document Counter"
+    type = "Document Counter"
 
     def __init__(self, output_folder: DataFolderLike):
         super().__init__()

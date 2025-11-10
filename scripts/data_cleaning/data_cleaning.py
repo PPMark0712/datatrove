@@ -1,5 +1,4 @@
 import os
-import argparse
 import dataclasses
 from functools import partial
 
@@ -19,6 +18,7 @@ from datatrove.pipeline.readers import JsonlReader,ParquetReader
 from datatrove.pipeline.tokens import TokensCounter
 from datatrove.pipeline.writers.jsonl import JsonlWriter
 from datatrove.utils.hashing import HashConfig
+from datatrove.utils.common_argparser import get_common_argparser
 from datatrove.data import Document
 
 
@@ -62,15 +62,8 @@ def wudao_adapter(self, data: dict, path: str, id_in_file: int | str):
 
 
 def get_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input_path", type=str, required=True)
-    parser.add_argument("--glob_pattern", type=str, default=None)
-    parser.add_argument("--output_path", type=str, required=True)
-    parser.add_argument("--rerun", action="store_true")
-    parser.add_argument("--tasks", type=int, default=64)
-    parser.add_argument("--workers", type=int, default=32)
+    parser = get_common_argparser()
     parser.add_argument("--languages", nargs="+", default=["zh"])
-    parser.add_argument("--limit", type=int, default=-1)
     args = parser.parse_args()
     return args
 

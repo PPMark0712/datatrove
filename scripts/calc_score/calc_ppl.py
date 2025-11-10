@@ -10,21 +10,16 @@ from datatrove.pipeline.perplexity import Encoder, PerplexityCalculator
 from datatrove.pipeline.readers import JsonlReader
 from datatrove.pipeline.writers.jsonl import JsonlWriter
 from datatrove.data import Document
+from datatrove.utils.common_argparser import get_common_argparser
 
 
 def get_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input_path", type=str, required=True)
-    parser.add_argument("--glob_pattern", type=str, default=None)
-    parser.add_argument("--output_path", type=str, required=True)
-    parser.add_argument("--rerun", action="store_true")
-    parser.add_argument("--tasks", type=int, default=16)
+    parser = get_common_argparser()
     parser.add_argument("--encoder_workers", type=int, default=16)
     parser.add_argument("--ppl_workers", type=int, default=16)
     parser.add_argument("--model_path", type=str, required=True)
     parser.add_argument("--max_model_len", type=int, default=4096)
     parser.add_argument("--tensor_parallel_size", type=int, default=1)
-    parser.add_argument("--limit", type=int, default=-1)
     args = parser.parse_args()
     assert args.tensor_parallel_size * args.ppl_workers <= len(os.environ["CUDA_VISIBLE_DEVICES"].split(","))
     return args

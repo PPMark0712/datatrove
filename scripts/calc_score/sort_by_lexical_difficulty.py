@@ -11,6 +11,7 @@ from datatrove.pipeline.cl_wordnet.lexical_difficulty_calculator import (
 )
 from datatrove.pipeline.writers.jsonl import JsonlWriter
 from datatrove.data import Document
+from datatrove.utils.common_argparser import get_common_argparser
 
 
 def input_adapter(self, data: dict, path: str, id_in_file: int | str):
@@ -35,14 +36,7 @@ def output_adapter(self, document: Document) -> dict:
 
 
 def get_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input_path", type=str, required=True)
-    parser.add_argument("--glob_pattern", type=str, default=None)
-    parser.add_argument("--output_path", type=str, required=True)
-    parser.add_argument("--rerun", action="store_true")
-    parser.add_argument("--tasks", type=int, default=64)
-    parser.add_argument("--workers", type=int, default=32)
-    parser.add_argument("--limit", type=int, default=-1)
+    parser = get_common_argparser()
     args = parser.parse_args()
     return args
 

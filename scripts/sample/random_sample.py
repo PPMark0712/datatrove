@@ -3,22 +3,18 @@ import argparse
 import dataclasses
 
 from datatrove.executor import LocalPipelineExecutor
-from datatrove.pipeline.samplers import RandomSampler
+from datatrove.pipeline.samplers import RandomSampler, DocumentCounter
 from datatrove.pipeline.readers import JsonlReader
 from datatrove.pipeline.writers.jsonl import JsonlWriter
 from datatrove.data import Document
+from datatrove.utils.common_argparser import get_common_argparser
 
 
 def get_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input_path", type=str, required=True)
-    parser.add_argument("--glob_pattern", type=str, default=None)
-    parser.add_argument("--output_path", type=str, required=True)
-    parser.add_argument("--rerun", action="store_true")
-    parser.add_argument("--tasks", type=int, default=16)
-    parser.add_argument("--workers", type=int, default=16)
-    parser.add_argument("--limit", type=int, default=-1)
-    parser.add_argument("--score_path", type=str, required=True)
+    parser = get_common_argparser()
+    parser.add_argument("--sample_rate", type=float, required=True)
+    parser.add_argument("--unit", type=str, default="document", choices=["document", "token"])
+    parser.add_argument("--token_count_path", type=str, default=None)
     args = parser.parse_args()
     return args
 
