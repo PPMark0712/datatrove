@@ -2,15 +2,13 @@
 CUDA_VISIBLE_DEVICES=4,5 python calc_ppl.py --input_path /mnt/data/kw/yyz/data/datatrove_output/MMedC_en_wordnet_1011/2_sorted_data --output_path /mnt/data/kw/yyz/data/datatrove_output/debug --limit 10 --model_path "/mnt/data/kw/models/Qwen/Qwen2.5-0.5B" --tasks 2 --workers 2
 """
 import os
-import argparse
-import dataclasses
 
 from datatrove.executor import LocalPipelineExecutor
 from datatrove.pipeline.perplexity import Encoder, PerplexityCalculator
 from datatrove.pipeline.readers import JsonlReader
 from datatrove.pipeline.writers.jsonl import JsonlWriter
-from datatrove.data import Document
 from datatrove.utils.common_argparser import get_common_argparser
+from datatrove.utils.io_adapters import input_adapter, output_adapter
 
 
 def get_args():
@@ -23,22 +21,6 @@ def get_args():
     args = parser.parse_args()
     assert args.tensor_parallel_size * args.ppl_workers <= len(os.environ["CUDA_VISIBLE_DEVICES"].split(","))
     return args
-
-
-def input_adapter(self, data: dict, path: str, id_in_file: int | str):
-    return {
-        "text": data.pop("text", ""),
-        "id": data.pop("id", f"{path}/{id_in_file}"),
-        "metadata": {
-            **data.pop("metadata", {}),
-            **data
-        },
-    }
-
-
-def output_adapter(self, document: Document) -> dict:
-    data = {key: val for key, val in dataclasses.asdict(document).items() if val}
-    return data
 
 
 def main():

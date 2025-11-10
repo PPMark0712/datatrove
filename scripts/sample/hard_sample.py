@@ -1,13 +1,11 @@
 import os
-import argparse
-import dataclasses
 
 from datatrove.executor import LocalPipelineExecutor
 from datatrove.pipeline.eta_dacp import HardSampler
 from datatrove.pipeline.readers import JsonlReader
 from datatrove.pipeline.writers.jsonl import JsonlWriter
-from datatrove.data import Document
 from datatrove.utils.common_argparser import get_common_argparser
+from datatrove.utils.io_adapters import input_adapter, output_adapter
 
 
 def get_args():
@@ -15,22 +13,6 @@ def get_args():
     parser.add_argument("--score_path", type=str, required=True)
     args = parser.parse_args()
     return args
-
-
-def input_adapter(self, data: dict, path: str, id_in_file: int | str):
-    return {
-        "text": data.pop("text", ""),
-        "id": data.pop("id", f"{path}/{id_in_file}"),
-        "metadata": {
-            **data.pop("metadata", {}),
-            **data
-        },
-    }
-
-
-def output_adapter(self, document: Document) -> dict:
-    data = {key: val for key, val in dataclasses.asdict(document).items() if val}
-    return data
 
 
 def main():

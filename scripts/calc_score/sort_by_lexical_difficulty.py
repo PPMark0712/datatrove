@@ -1,5 +1,4 @@
 import os
-import argparse
 import dataclasses
 # import nltk
 # nltk.data.path.append("/data1/yyz/downloads/models/nltk_data")
@@ -12,27 +11,7 @@ from datatrove.pipeline.cl_wordnet.lexical_difficulty_calculator import (
 from datatrove.pipeline.writers.jsonl import JsonlWriter
 from datatrove.data import Document
 from datatrove.utils.common_argparser import get_common_argparser
-
-
-def input_adapter(self, data: dict, path: str, id_in_file: int | str):
-    # text = data["question"] + "\n"
-    # for option in data["options"].values():
-    #     text += option + "\n"
-    # print(text)
-    text = data["text"]
-    return {
-        "text": text,
-        "id": data.pop("id", f"{path}/{id_in_file}"),
-        "metadata": {
-            **data.pop("meta", {}),
-            **data
-        },
-    }
-
-
-def output_adapter(self, document: Document) -> dict:
-    data = {key: val for key, val in dataclasses.asdict(document).items() if val}
-    return data
+from datatrove.utils.io_adapters import input_adapter, output_adapter
 
 
 def get_args():
