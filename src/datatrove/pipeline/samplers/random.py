@@ -4,8 +4,32 @@ from typing import List, Literal
 from datatrove.data import DocumentsPipeline
 from datatrove.pipeline.base import PipelineStep
 from datatrove.io import DataFolderLike
-from .base import BaseSampler
+from .base import BaseSampler, BaseIndexSampler
 from .utils import read_score_file
+
+
+class IndexRandomSampler(BaseIndexSampler):
+    def __init__(self, sample_rate: float) -> None:
+        super().__init__()
+        self.sample_rate = sample_rate
+
+    def sample_by_doc_count(self, indexes: List[int]) -> List[int]:
+        sample_size = int(len(indexes) * self.sample_rate)
+        return random.sample(indexes, sample_size)
+
+    def sample_by_token_limit(self, indexes: List[int], token_counts: List[int]) -> List[int]:
+        shuffled_indexes = indexes.copy()
+        random.shuffle(shuffled_indexes)
+        total_tokens = sum(token_counts[i] for i in indexes)
+        sample_tokens = int(total_tokens * self.sample_rate)
+        sampled_indexes = []
+        current_tokens = 0
+        for i in shuffled_indexes:
+            current_tokens += token_counts[i]
+            sampled_indexes.append(i)
+            if current_tokens >= sample_tokens:
+                break
+        return sampled_indexes
 
 
 class DocumentCounter(PipelineStep):
@@ -46,22 +70,11 @@ class RandomSampler(BaseSampler):
     def sample_indexes(self, rank: int = 0, world_size: int = 1) -> List[int]:
         random.seed(self.seed)
         with self.count_folder.open(f"{rank:05d}.txt", "r") as f:
-            total_count = int(f.read().strip())
-        indexes = list(range(total_count))
-        random.shuffle(indexes)
-        sample_size = int(total_count * self.sample_rate)
-
+            doc_count = int(f.read())
+        indexes = list(range(doc_count))
+        random_index_sampler = IndexRandomSampler(self.sample_rate)
         if self.unit == "doc":
-            return indexes[:sample_size]
+            return random_index_sampler.sample_by_doc_count(indexes)
         elif self.unit == "token":
             token_counts = read_score_file(self.token_count_folder, rank)
-            current_tokens = 0
-            total_tokens = sum(token_counts)
-            sample_tokens = int(total_tokens * self.sample_rate)
-            sampled_indexes = []
-            for i in indexes:
-                current_tokens += token_counts[i]
-                sampled_indexes.append(i)
-                if current_tokens >= sample_tokens:
-                    break
-            return sampled_indexes
+            return random_index_sampler.sample_by_token_limit(indexes, token_counts)

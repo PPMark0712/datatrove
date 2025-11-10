@@ -1,4 +1,4 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from typing import List
 
 from datatrove.data import DocumentsPipeline
@@ -6,7 +6,37 @@ from datatrove.pipeline.base import PipelineStep
 from datatrove.utils.logging import logger
 
 
-class BaseSampler(PipelineStep):
+class BaseIndexSampler(ABC):
+    @abstractmethod
+    def sample_by_doc_count(self, indexes: List[int]) -> List[int]:
+        """Sample documents by specified count constraint (preserves complete documents).
+
+        Args:
+            indexes: List of document indexes to sample from (1D list of integers)
+
+        Returns:
+            List[int]: Sampled document indexes (sorted or in original order based on subclass implementation)
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def sample_by_token_limit(self, indexes: List[int], token_counts: List[int]) -> List[int]:
+        """Sample documents by accumulated token limit (preserves complete documents, no splitting).
+        Critical note: `token_counts` is a global mapping array where `token_counts[i]` returns the token count
+        of the document with original index `i` — it is NOT a list of the same length as `indexes`.
+
+        Args:
+            indexes: List of document indexes to sample from (1D list of integers)
+            token_counts: Global token count mapping array (indexed by original document index). 
+                For any index `i` in `indexes`, `token_counts[i]` gives the corresponding document's token count.
+
+        Returns:
+            List[int]: Sampled document indexes (complete documents only, accumulated tokens ≤ limit)
+        """
+        raise NotImplementedError
+
+
+class BaseSampler(PipelineStep, ABC):
     """Base module for Samplers. Sample data by score."""
     type = "Sampler"
 
