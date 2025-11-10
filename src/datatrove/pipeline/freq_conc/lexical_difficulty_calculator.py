@@ -61,7 +61,6 @@ class LexicalDifficultyCalculator(PipelineStep):
         super().__init__()
         self.output_folder = get_datafolder(output_folder)
         self.kwargs = kwargs
-        self._check_nltk_dependencies()
 
         logger.info("building dict")
         self.stop_words = set(stopwords.words("english"))
@@ -96,20 +95,6 @@ class LexicalDifficultyCalculator(PipelineStep):
         self.log_freq_center = freqs[sigmoid_center_id]
         logger.info("initialized")
 
-    def _check_nltk_dependencies(self):
-        if "nltk_path" in self.kwargs:
-            nltk.data.path.append(self.kwargs["nltk_path"])
-        return
-        nltk_dependencies = [
-            "wordnet",
-            "stopwords",
-            "punkt_tab",
-            "averaged_perceptron_tagger_eng",
-        ]
-        for package in nltk_dependencies:
-            # logger.debug(f"checking {package}")
-            nltk.download(package, download_dir=self.kwargs.get("nltk_path", None))
-
     def is_valid_word(self, word: str) -> bool:
         if len(word) <= 1:
             return False
@@ -131,6 +116,8 @@ class LexicalDifficultyCalculator(PipelineStep):
                 continue
             pos = pos[0]
             if pos == "N":
+                # Considering that the word sense disambiguation accuracy fails to meet expectations, we adopt the default sense difficulty of the vocabulary.
+
                 # context = words[max(0, i - window_r): min(len(words), i + window_r + 1)]
                 # synset = lesk(context, word, pos=wn.NOUN)
                 synsets = wn.synsets(word, pos=wn.NOUN)
@@ -154,10 +141,10 @@ class LexicalDifficultyCalculator(PipelineStep):
     def run(self, data: DocumentsPipeline, rank: int = 0, world_size: int = 1):
         if "nltk_path" in self.kwargs:
             nltk.data.path.append(self.kwargs["nltk_path"])
-        difficulty_list = []
         with self.track_time():
+            difficulty_list = []
             for i, doc in enumerate(data):
-                if (i + 1) % 1000 == 0:
+                if (i + 1) % 10000 == 0:
                     logger.debug(f"processed {i + 1} docs")
                 noun_scores_with_words, non_noun_scores_with_words = self.calc_score(doc.text)
                 noun_scores_with_words.sort(key=lambda x: x[0], reverse=True)
@@ -171,8 +158,8 @@ class LexicalDifficultyCalculator(PipelineStep):
                 non_noun_difficulty = merge_score(non_noun_scores)
                 difficulty = self.noun_weight * noun_difficulty + (1 - self.noun_weight) * non_noun_difficulty
                 difficulty_list.append(difficulty)
-        with self.output_folder.open(f"{rank:05d}.json", mode="w") as f:
-            json.dump(difficulty_list, f)
+            with self.output_folder.open(f"{rank:05d}.json", mode="w") as f:
+                json.dump(difficulty_list, f)
 
 
 class WeightSorter(PipelineStep):
