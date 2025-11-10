@@ -36,6 +36,4 @@ class BinWriter(DiskWriter):
         )
 
     def _write(self, document: dict, file_handler: IO, _filename: str):
-        import orjson
-
-        file_handler.write(orjson.dumps(document, option=orjson.OPT_APPEND_NEWLINE))
+        raise NotImplementedError  # todo
