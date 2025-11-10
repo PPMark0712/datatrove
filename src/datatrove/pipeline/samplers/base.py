@@ -1,8 +1,7 @@
 from abc import abstractmethod
-from typing import List, Literal
+from typing import List
 
 from datatrove.data import DocumentsPipeline
-from datatrove.io import DataFolderLike, get_datafolder
 from datatrove.pipeline.base import PipelineStep
 from datatrove.utils.logging import logger
 

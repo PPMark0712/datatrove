@@ -1,6 +1,8 @@
 import random
 from typing import List, Literal
 
+from datatrove.data import DocumentsPipeline
+from datatrove.pipeline.base import PipelineStep
 from datatrove.io import DataFolderLike
 from .base import BaseSampler
 from .utils import read_score_file
