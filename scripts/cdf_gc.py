@@ -18,6 +18,7 @@ from datatrove.pipeline.tokens import TokensCounter
 from datatrove.pipeline.writers.jsonl import JsonlWriter
 from datatrove.data import Document
 
+
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_path", type=str, required=True)
