@@ -36,7 +36,7 @@ def main():
         tasks=args.tasks,
         workers=args.workers,
         skip_completed=not args.rerun,
-        logging_dir=log_path
+        logging_dir=os.path.join(log_path, "count_tokens")
     )
     executor.run()
 

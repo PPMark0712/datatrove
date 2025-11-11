@@ -1,6 +1,6 @@
 from typing import List, Literal
 
-from datatrove.io import DataFolderLike
+from datatrove.io import DataFolderLike, get_datafolder
 from .base import BaseSampler, BaseIndexSampler
 from .utils import read_score_file
 
@@ -46,11 +46,11 @@ class HardSampler(BaseSampler):
         token_count_folder: DataFolderLike = None
     ):
         super().__init__()
-        self.score_folder = get_data_folder(score_folder)
+        self.score_folder = get_datafolder(score_folder)
         self.sample_rate = sample_rate
         self.higher_is_better = higher_is_better
         self.unit = unit
-        self.token_count_folder = get_data_folder(token_count_folder) if token_count_folder else None
+        self.token_count_folder = get_datafolder(token_count_folder) if token_count_folder else None
 
     def get_sampled_indexes(self, rank: int = 0, world_size: int = 1) -> List[int]:
         score = read_score_file(self.score_folder, rank)
