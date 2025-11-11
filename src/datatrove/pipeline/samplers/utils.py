@@ -33,4 +33,3 @@ def read_score_file(score_folder: DataFolderLike, rank: int):
         except FileNotFoundError:
             continue
     raise FileNotFoundError(f"Score file for rank {rank} not found in {score_folder}")
-

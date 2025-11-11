@@ -1,7 +1,10 @@
+import json
+
 from datatrove.data import DocumentsPipeline
 from datatrove.pipeline.base import PipelineStep
 from datatrove.utils.batching import batched
 from datatrove.utils.tokenization import PipelineStepWithTokenizer
+from datatrove.io import DataFolderLike, get_datafolder
 
 
 class TokensCounter(PipelineStepWithTokenizer):
@@ -23,10 +26,12 @@ class TokensCounter(PipelineStepWithTokenizer):
         tokenizer_name_or_path: str = "gpt2",  # tokenizer to use, from HF or a local file path
         count_eos_token: bool = False,  # whether to count the EOS token on each document
         batch_size: int = 10000,  # batch size for tokenization
+        output_folder: DataFolderLike = None,  # folder to save token count
     ):
         super().__init__(tokenizer_name_or_path)
         self.count_eos_token = count_eos_token
         self.batch_size = batch_size
+        self.output_folder = get_datafolder(output_folder) if output_folder else None
 
     def run(self, data: DocumentsPipeline, rank: int = 0, world_size: int = 1) -> DocumentsPipeline:
         """
@@ -41,8 +46,8 @@ class TokensCounter(PipelineStepWithTokenizer):
 
         """
         from tokenizers import Encoding
-
         # tokenize document's text in batches to go faster
+        token_counts = []
         for batch in batched(data, self.batch_size):
             with self.track_time(unit="batch"):
                 encoded_batch: list[Encoding] = self.tokenizer.encode_batch([document.text for document in batch])
@@ -52,7 +57,11 @@ class TokensCounter(PipelineStepWithTokenizer):
                     count += 1
                 document.metadata["token_count"] = count
                 self.stat_update("tokens", value=count)
+                token_counts.append(count)
                 yield document
+        if self.output_folder is not None:
+            with self.output_folder.open(f"{rank:05d}.json", "w") as f:
+                json.dump(token_counts, f)
 
 
 class LengthCounter(PipelineStep):
