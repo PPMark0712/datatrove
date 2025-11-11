@@ -11,7 +11,7 @@ from datatrove.utils.io_adapters import input_adapter, output_adapter
 def get_args():
     parser = get_common_argparser()
     parser.add_argument("--sample_rate", type=float, required=True)
-    parser.add_argument("--unit", type=str, default="document", choices=["document", "token"])
+    parser.add_argument("--unit", type=str, default="doc", choices=["doc", "token"])
     parser.add_argument("--token_count_path", type=str, default=None)
     args = parser.parse_args()
     assert 0 <= args.sample_rate <= 1, "sample_rate must be between 0 and 1"

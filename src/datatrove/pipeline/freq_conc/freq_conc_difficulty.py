@@ -41,9 +41,9 @@ def merge_score(scores: list, alpha=1.5, top_p=0.1, top_weight=0.7):
     return power_mean(top_k_scores, alpha) * top_weight + power_mean(other_scores, alpha) * (1 - top_weight)
 
 
-class LexicalDifficultyCalculator(PipelineStep):
-    name = "Lexical Difficulty Calculator"
-    type = "Curriculum Learning"
+class FcdCalculator(PipelineStep):
+    name = "Frequency-Concept Difficulty Calculator"
+    type = "Freq - Conc"
 
     def __init__(
         self,
@@ -143,9 +143,9 @@ class LexicalDifficultyCalculator(PipelineStep):
             nltk.data.path.append(self.kwargs["nltk_path"])
         with self.track_time():
             difficulty_list = []
-            for i, doc in enumerate(data):
-                if (i + 1) % 10000 == 0:
-                    logger.debug(f"processed {i + 1} docs")
+            for i, doc in enumerate(data, 1):
+                if i % 10000 == 0:
+                    logger.debug(f"processed {i} docs")
                 noun_scores_with_words, non_noun_scores_with_words = self.calc_score(doc.text)
                 noun_scores_with_words.sort(key=lambda x: x[0], reverse=True)
                 non_noun_scores_with_words.sort(key=lambda x: x[0], reverse=True)
@@ -160,29 +160,3 @@ class LexicalDifficultyCalculator(PipelineStep):
                 difficulty_list.append(difficulty)
             with self.output_folder.open(f"{rank:05d}.json", mode="w") as f:
                 json.dump(difficulty_list, f)
-
-
-class WeightSorter(PipelineStep):
-    name = "Weight Sorter"
-    type = "Curriculum Learning"
-
-    def __init__(
-        self,
-        difficulty_folder: DataFolderLike,
-    ):
-        super().__init__()
-        self.difficulty_folder = get_datafolder(difficulty_folder)
-
-    def run(self, data: DocumentsPipeline, rank: int = 0, world_size: int = 1):
-        with self.track_time():
-            all_docs = []
-            for doc in data:
-                all_docs.append(doc)
-            with self.difficulty_folder.open(f"{rank:05d}.json", "r") as f:
-                difficulty_list = json.load(f)
-            idxs = list(range(len(difficulty_list)))
-            idxs.sort(key=lambda x: difficulty_list[x])
-            # logger.debug(idxs)
-            for idx in idxs:
-                all_docs[idx].metadata["lexical_difficulty"] = difficulty_list[idx]
-                yield all_docs[idx]
