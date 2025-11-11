@@ -19,14 +19,24 @@ def get_args():
 def check_nltk_dependencies(nltk_path: str = None):
     if nltk_path:
         nltk.data.path.append(nltk_path)
-    nltk_dependencies = [
-        "wordnet",
-        "stopwords",
-        "punkt_tab",
-        "averaged_perceptron_tagger_eng",
-    ]
-    for package in nltk_dependencies:
-        nltk.download(package, download_dir=nltk_path)
+    nltk_dependencies = {
+        "corpora": [
+            "wordnet",
+            "stopwords"
+        ],
+        "tokenizers": [
+            "punkt_tab"
+        ],
+        "taggers": [
+            "averaged_perceptron_tagger_eng"
+        ]
+    }
+    for path, packages in nltk_dependencies.items():
+        for package in packages:
+            try:
+                nltk.data.find(f"{path}/{package}")
+            except LookupError:
+                nltk.download(package, download_dir=nltk_path)
 
 
 def main():
@@ -34,7 +44,7 @@ def main():
     check_nltk_dependencies(args.nltk_path)
 
     MAIN_OUTPUT_PATH = args.output_path
-    difficulty_path = os.path.join(MAIN_OUTPUT_PATH, "lexical_difficulty")
+    difficulty_path = os.path.join(MAIN_OUTPUT_PATH, "freq_conc_difficulty")
     LOG_PATH = os.path.join(MAIN_OUTPUT_PATH, "logs")
 
     executor = LocalPipelineExecutor(
@@ -43,17 +53,17 @@ def main():
                 data_folder=args.input_path,
                 glob_pattern=args.glob_pattern,
                 adapter=input_adapter,
-                limit=args.limit
+                limit=args.limit,
             ),
             LexicalDifficultyCalculator(
                 output_folder=difficulty_path,
-                nltk_path=args.nltk_path
+                nltk_path=args.nltk_path,
             ),
         ],
         tasks=args.tasks,
         workers=args.workers,
         logging_dir=os.path.join(LOG_PATH, "calc_freq_conc"),
-        skip_completed=not args.rerun
+        skip_completed=not args.rerun,
     )
     executor.run()
 
