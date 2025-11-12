@@ -1,7 +1,7 @@
 import os
 
 from datatrove.executor import LocalPipelineExecutor
-from datatrove.pipeline.samplers import HardSampler
+from datatrove.pipeline.samplers import CdfSampler
 from datatrove.pipeline.readers import JsonlReader
 from datatrove.pipeline.writers.jsonl import JsonlWriter
 from datatrove.utils.common_argparser import get_common_argparser
@@ -32,7 +32,7 @@ def main():
                 adapter=input_adapter,
                 limit=args.limit
             ),
-            HardSampler(
+            CdfSampler(
                 score_folder=args.score_path,
                 sample_rate=args.sample_rate,
                 unit=args.unit,

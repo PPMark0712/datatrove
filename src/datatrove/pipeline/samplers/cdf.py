@@ -1,10 +1,9 @@
 import random
 from typing import List, Literal
 
-from datatrove.io import DataFolderLike
+from datatrove.io import DataFolderLike, get_datafolder
 from .base import BaseSampler, BaseIndexSampler
 from .random import IndexRandomSampler
-from .hard import IndexHardSampler
 from .utils import read_score_file
 
 
@@ -72,20 +71,20 @@ class IndexCdfBalancedSampler(BaseIndexSampler):
             indexes = indexes[::-1]
         n = len(indexes)
         sample_count = int(n * self.sample_rate)
-        hard_sample_count = int(n * self.rate_for_hard_sample)
+        hard_sample_count = int(sample_count * self.rate_for_hard_sample)
         cdf_sample_count = sample_count - hard_sample_count
-        hard_sample_split_index = n - hard_sample_count * self.hard_sample_range
+        hard_sample_split_index = int(n - hard_sample_count * self.hard_sample_range)
 
         if hard_sample_split_index < n:
             hard_sample_split = indexes[hard_sample_split_index:]
-            random_index_sampler = IndexRandomSampler(hard_sample_count / len(hard_sample_split), reverse)
+            random_index_sampler = IndexRandomSampler(hard_sample_count / len(hard_sample_split))
             hard_sample_result = random_index_sampler.sample_by_doc_count(hard_sample_split)
         else:
             hard_sample_result = []
 
         if hard_sample_split_index > 0:
             cdf_sample_split = indexes[:hard_sample_split_index]
-            cdf_sampler = IndexCdfSampler(cdf_sample_count / len(cdf_sample_split), reverse)
+            cdf_sampler = IndexCdfSampler(cdf_sample_count / len(cdf_sample_split))
             cdf_sample_result = cdf_sampler.sample_by_doc_count(cdf_sample_split)
         else:
             cdf_sample_result = []
@@ -97,7 +96,7 @@ class IndexCdfBalancedSampler(BaseIndexSampler):
             indexes = indexes[::-1]
         n = len(indexes)
         total_tokens = sum(token_counts[i] for i in indexes)
-        hard_sample_tokens = int(n * self.rate_for_hard_sample)
+        hard_sample_tokens = int(total_tokens * self.rate_for_hard_sample)
         cdf_sample_tokens = total_tokens - hard_sample_tokens
 
         accumulated_tokens = 0
@@ -111,7 +110,7 @@ class IndexCdfBalancedSampler(BaseIndexSampler):
         if hard_sample_split_index < n:
             hard_sample_split = indexes[hard_sample_split_index:]
             sum_tokens = sum(token_counts[i] for i in hard_sample_split)
-            random_index_sampler = IndexRandomSampler(hard_sample_tokens / sum_tokens, reverse)
+            random_index_sampler = IndexRandomSampler(hard_sample_tokens / sum_tokens)
             hard_sample_result = random_index_sampler.sample_by_token_limit(hard_sample_split, token_counts)
         else:
             hard_sample_result = []
@@ -119,7 +118,7 @@ class IndexCdfBalancedSampler(BaseIndexSampler):
         if hard_sample_split_index > 0:
             cdf_sample_split = indexes[:hard_sample_split_index]
             sum_tokens = sum(token_counts[i] for i in cdf_sample_split)
-            cdf_sampler = IndexCdfSampler(cdf_sample_tokens / sum_tokens, reverse)
+            cdf_sampler = IndexCdfSampler(cdf_sample_tokens / sum_tokens)
             cdf_sample_result = cdf_sampler.sample_by_doc_count(cdf_sample_split)
         else:
             cdf_sample_result = []
@@ -127,7 +126,7 @@ class IndexCdfBalancedSampler(BaseIndexSampler):
         return cdf_sample_result + hard_sample_result
 
 
-class CDFSampler(BaseSampler):
+class CdfSampler(BaseSampler):
     """Sample data with highest score."""
     type = "Sampler"
     name = "CDF Sampler"
@@ -143,43 +142,23 @@ class CDFSampler(BaseSampler):
         seed: int = 42
     ):
         super().__init__()
-        self.score_folder = get_data_folder(score_folder)
+        self.score_folder = get_datafolder(score_folder)
         self.sample_rate = sample_rate
         self.hard_sample_ratio = hard_sample_ratio
         self.reverse = reverse
         self.unit = unit
-        self.token_count_folder = get_data_folder(token_count_folder) if token_count_folder else None
+        self.token_count_folder = get_datafolder(token_count_folder) if token_count_folder else None
+        self.seed = seed
 
     def get_sampled_indexes(self, rank: int = 0, world_size: int = 1) -> List[int]:
-        random.seed(seed)
+        random.seed(self.seed)
         score = read_score_file(self.score_folder, rank)
         indexes = list(range(len(score)))
         indexes.sort(key=lambda x: score[x], reverse=self.reverse)
+        index_sampler = IndexCdfBalancedSampler(self.sample_rate, self.hard_sample_ratio, reverse=self.reverse)
 
         if self.unit == "doc":
-            sample_count = int(len(indexes) * self.sample_rate)
-            hard_sample_count = int(sample_count * self.hard_sample_ratio)
-            soft_sample_count = sample_count - hard_sample_count
-
-            hard_sample_indexes = indexes[-hard_sample_count:] if hard_sample_count else []
-            remain_indexes = indexes[:-hard_sample_count] if hard_sample_count else indexes
-
-            expected_soft_sample_count = 0
-            for i in remain_indexes:
-                if random.random() < expected_soft_sample_count / len(remain_indexes):
-                    soft_sample_indexes.append(i)
-                    expected_soft_sample_count -= 1
-
-
+            return index_sampler.sample_by_doc_count(indexes)
         elif self.unit == "token":
             token_counts = read_score_file(self.token_count_folder, rank)
-            current_tokens = 0
-            total_tokens = sum(token_counts)
-            sample_tokens = int(total_tokens * self.sample_rate)
-            sampled_indexes = []
-            for i in indexes:
-                current_tokens += token_counts[i]
-                sampled_indexes.append(i)
-                if current_tokens >= sample_tokens:
-                    break
-            return sampled_indexes
+            return index_sampler.sample_by_token_limit(indexes, token_counts)

@@ -43,7 +43,7 @@ def merge_score(scores: list, alpha=1.5, top_p=0.1, top_weight=0.7):
 
 class FcdCalculator(PipelineStep):
     name = "Frequency-Concept Difficulty Calculator"
-    type = "Freq - Conc"
+    type = "Freq-Conc"
 
     def __init__(
         self,
@@ -104,7 +104,7 @@ class FcdCalculator(PipelineStep):
             return False
         return True
 
-    def calc_score(self, text: list) -> dict:
+    def calc_score(self, text: str) -> dict:
         words = word_tokenize(text)
         words_with_pos = pos_tag(words)
         # logger.debug(words_with_pos)
@@ -139,7 +139,7 @@ class FcdCalculator(PipelineStep):
         return noun_scores, non_noun_scores
 
     def run(self, data: DocumentsPipeline, rank: int = 0, world_size: int = 1):
-        if "nltk_path" in self.kwargs:
+        if self.kwargs.get("nltk_path") is not None:
             nltk.data.path.append(self.kwargs["nltk_path"])
         with self.track_time():
             difficulty_list = []

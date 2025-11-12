@@ -41,7 +41,7 @@ def check_nltk_dependencies(nltk_path: str = None):
 
 def main():
     args = get_args()
-    check_nltk_dependencies(args.nltk_path)
+    # check_nltk_dependencies(args.nltk_path)
 
     MAIN_OUTPUT_PATH = args.output_path
     difficulty_path = os.path.join(MAIN_OUTPUT_PATH, "freq_conc_difficulty")
