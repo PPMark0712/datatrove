@@ -96,8 +96,9 @@ class IndexCdfBalancedSampler(BaseIndexSampler):
             indexes = indexes[::-1]
         n = len(indexes)
         total_tokens = sum(token_counts[i] for i in indexes)
-        hard_sample_tokens = int(total_tokens * self.rate_for_hard_sample)
-        cdf_sample_tokens = total_tokens - hard_sample_tokens
+        sample_tokens = int(total_tokens * self.sample_rate)
+        hard_sample_tokens = int(sample_tokens * self.rate_for_hard_sample)
+        cdf_sample_tokens = sample_tokens - hard_sample_tokens
 
         accumulated_tokens = 0
         hard_sample_split_index = n

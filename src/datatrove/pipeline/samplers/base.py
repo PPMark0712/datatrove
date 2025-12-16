@@ -60,12 +60,11 @@ class BaseSampler(PipelineStep, ABC):
             sorted_indexes = self._normalize_indexes(sampled_indexes)
             p = 0
             origin_doc_count = 0
-            sampled_doc_count = 0
+            sampled_doc_count = len(sorted_indexes)
             for i, doc in enumerate(data):
                 origin_doc_count += 1
                 if p < len(sorted_indexes) and i == sorted_indexes[p]:
                     yield doc
                     p += 1
-                    sampled_doc_count += 1
             sample_rate = sampled_doc_count / origin_doc_count if origin_doc_count else 0
             logger.info(f"sampled {sampled_doc_count}/{origin_doc_count} ({sample_rate * 100:.2f}%) docs.")
