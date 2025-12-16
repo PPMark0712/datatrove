@@ -20,15 +20,19 @@ class FinewebEduScoreCalculator(PipelineStep):
     def run(self, data: DocumentsPipeline, rank: int = 0, world_size: int = 1):
         logger.info(f"loading model from {self.model_path}")
         model = AutoModelForSequenceClassification.from_pretrained(self.model_path)
+        gpu_id = self._local_rank
+        model = model.to(f"cuda:{gpu_id}")
         tokenizer = AutoTokenizer.from_pretrained(self.model_path)
         with self.track_time():
             scores = []
             for i, doc in enumerate(data, 1):
-                logger.info(f"processing doc {i}")
+                if i % 1000 == 0:
+                    logger.info(f"processing doc {i}")
                 text = doc.text
                 inputs = tokenizer(text, return_tensors="pt", padding="longest", truncation=True)
+                inputs = inputs.to(f"cuda:{gpu_id}")
                 outputs = model(**inputs)
-                logits = outputs.logits.squeeze(-1).float().detach().numpy()
+                logits = outputs.logits.squeeze(-1).float().detach().cpu().numpy()
                 score = logits.item()
                 scores.append(score)
             with self.output_folder.open(f"{rank:05d}.json", mode="w") as f:
