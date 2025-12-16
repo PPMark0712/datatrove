@@ -17,6 +17,7 @@ def get_args():
 
 
 def check_nltk_dependencies(nltk_path: str = None):
+    print("checking nltk dependencies")
     if nltk_path:
         nltk.data.path.append(nltk_path)
     nltk_dependencies = {
@@ -34,9 +35,12 @@ def check_nltk_dependencies(nltk_path: str = None):
     for path, packages in nltk_dependencies.items():
         for package in packages:
             try:
+                print(f"looking up {path}/{package}")
                 nltk.data.find(f"{path}/{package}")
             except LookupError:
+                print(f"nltk package {package} not found, downloading...")
                 nltk.download(package, download_dir=nltk_path)
+    print("all nltk dependencies are installed")
 
 
 def main():
