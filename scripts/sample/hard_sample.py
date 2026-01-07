@@ -13,6 +13,7 @@ def get_args():
     parser.add_argument("--score_path", type=str, required=True)
     parser.add_argument("--sample_rate", type=float, required=True)
     parser.add_argument("--unit", type=str, default="doc", choices=["doc", "token"])
+    parser.add_argument("--lower_is_better", action="store_true")
     parser.add_argument("--token_count_path", type=str, default=None)
     args = parser.parse_args()
     return args
@@ -36,6 +37,7 @@ def main():
                 score_folder=args.score_path,
                 sample_rate=args.sample_rate,
                 unit=args.unit,
+                higher_is_better=not args.lower_is_better,
                 token_count_folder=args.token_count_path
             ),
             JsonlWriter(
