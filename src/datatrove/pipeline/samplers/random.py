@@ -3,7 +3,7 @@ from typing import List, Literal
 
 from datatrove.data import DocumentsPipeline
 from datatrove.pipeline.base import PipelineStep
-from datatrove.io import DataFolderLike
+from datatrove.io import DataFolderLike, get_datafolder
 from .base import BaseSampler, BaseIndexSampler
 from .utils import read_score_file
 
@@ -38,7 +38,7 @@ class DocumentCounter(PipelineStep):
 
     def __init__(self, output_folder: DataFolderLike):
         super().__init__()
-        self.output_folder = get_data_folder(output_folder)
+        self.output_folder = get_datafolder(output_folder)
 
     def run(self, data: DocumentsPipeline = None, rank: int = 0, world_size: int = 1) -> DocumentsPipeline:
         count = sum(1 for _ in data)
@@ -59,15 +59,14 @@ class RandomSampler(BaseSampler):
         unit: Literal["doc", "token"] = "doc",
         token_count_folder: DataFolderLike = None
     ):
-        super().__init__(score_folder)
+        super().__init__()
         self.sample_rate = sample_rate
-        self.count_folder = get_data_folder(count_folder)
+        self.count_folder = get_datafolder(count_folder)
         self.seed = seed
-        self.higher_is_better = higher_is_better
         self.unit = unit
-        self.token_count_folder = get_data_folder(token_count_folder) if token_count_folder else None
+        self.token_count_folder = get_datafolder(token_count_folder) if token_count_folder else None
 
-    def sample_indexes(self, rank: int = 0, world_size: int = 1) -> List[int]:
+    def get_sampled_indexes(self, rank: int = 0, world_size: int = 1) -> List[int]:
         random.seed(self.seed)
         with self.count_folder.open(f"{rank:05d}.txt", "r") as f:
             doc_count = int(f.read())
