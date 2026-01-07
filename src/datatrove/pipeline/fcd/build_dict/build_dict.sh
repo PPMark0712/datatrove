@@ -1,0 +1,4 @@
+python get_basic_words.py
+python download_google_ngram.py
+python calc_word_freq.py
+python calc_dis_to_basic.py
