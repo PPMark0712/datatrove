@@ -4,7 +4,7 @@ import nltk
 
 from datatrove.executor.local import LocalPipelineExecutor
 from datatrove.pipeline.readers import JsonlReader
-from datatrove.pipeline.freq_conc import FcdCalculator
+from datatrove.pipeline.fcd import FcdCalculator
 from datatrove.utils.common_argparser import get_common_argparser
 from datatrove.utils.io_adapters import input_adapter
 
@@ -12,6 +12,12 @@ from datatrove.utils.io_adapters import input_adapter
 def get_args():
     parser = get_common_argparser()
     parser.add_argument("--nltk_path", type=str, default=None)
+    parser.add_argument("--freq_scaling_factor", type=float, default=0.7)
+    parser.add_argument("--w_f", type=float, default=0.5)
+    parser.add_argument("--power_mean_alpha", type=float, default=1.5)
+    parser.add_argument("--agg_top_quantile", type=float, default=0.9)
+    parser.add_argument("--agg_top_weight", type=float, default=0.7)
+    parser.add_argument("--noun_weight", type=float, default=0.7)
     args = parser.parse_args()
     return args
 
@@ -48,7 +54,7 @@ def main():
     # check_nltk_dependencies(args.nltk_path)
 
     MAIN_OUTPUT_PATH = args.output_path
-    difficulty_path = os.path.join(MAIN_OUTPUT_PATH, "freq_conc_difficulty")
+    difficulty_path = os.path.join(MAIN_OUTPUT_PATH, "fcd_score")
     LOG_PATH = os.path.join(MAIN_OUTPUT_PATH, "logs")
 
     executor = LocalPipelineExecutor(
@@ -62,11 +68,17 @@ def main():
             FcdCalculator(
                 output_folder=difficulty_path,
                 nltk_path=args.nltk_path,
+                freq_scaling_factor=args.freq_scaling_factor,
+                w_f=args.w_f,
+                power_mean_alpha=args.power_mean_alpha,
+                agg_top_quantile=args.agg_top_quantile,
+                agg_top_weight=args.agg_top_weight,
+                noun_weight=args.noun_weight,
             ),
         ],
         tasks=args.tasks,
         workers=args.workers,
-        logging_dir=os.path.join(LOG_PATH, "calc_freq_conc_difficulty"),
+        logging_dir=os.path.join(LOG_PATH, "calc_fcd"),
         skip_completed=not args.rerun,
     )
     executor.run()
