@@ -1,5 +1,6 @@
 import json
 import math
+import os
 
 import nltk
 from nltk.corpus import wordnet as wn
@@ -45,55 +46,67 @@ def agg_scores(scores: list, alpha=1.5, top_quantile=0.9, top_weight=0.7):
 
 class FcdCalculator(PipelineStep):
     name = "Frequency-Concept Difficulty Calculator"
-    type = "Freq-Conc"
+    type = "FCD"
 
     def __init__(
         self,
         output_folder: DataFolderLike,
         freq_scaling_factor=0.7,
-        log_freq_center=math.log(36597166),
+        log_freq_center=None,  # math.log(36597166),
+        log_freq_quantile=0.1,
+        basic_words_path=os.path.join(os.path.dirname(__file__), "build_dict", "data", "basic_words.txt"),
+        dis_to_basic_path=os.path.join(os.path.dirname(__file__), "build_dict", "data", "dis_to_basic.txt"),
+        word_freq_path=os.path.join(os.path.dirname(__file__), "build_dict", "data", "word_freq.txt"),
+        w_f=0.5,
         power_mean_alpha=1.5,
         agg_top_quantile=0.9,
         agg_top_weight=0.7,
         noun_weight=0.7,
-        dis_to_basic_path = "/mnt/data/kw/yyz/projects/CurriculumLearning/build_dict/output/dict/dis_to_basic.txt",
-        word_freq_path = "/mnt/data/kw/yyz/projects/CurriculumLearning/build_dict/output/dict/word_freq.txt",
         **kwargs
     ):
         super().__init__()
         self.output_folder = get_datafolder(output_folder)
         self.kwargs = kwargs
+        self.w_f = w_f
+        self.basic_words_path = basic_words_path
+        self.dis_to_basic_path = dis_to_basic_path
+        self.word_freq_path = word_freq_path
+        self.freq_scaling_factor = freq_scaling_factor
+        self.power_mean_alpha = power_mean_alpha
+        self.agg_top_quantile = agg_top_quantile
+        self.agg_top_weight = agg_top_weight
+        self.noun_weight = noun_weight
+        self.log_freq_center = log_freq_center
+        self.log_freq_quantile = log_freq_quantile
 
+    def init_dict(self):
         logger.info("building dict")
+        if self.kwargs.get("nltk_path") is not None:
+            nltk.data.path.append(self.kwargs["nltk_path"])
         self.stop_words = set(stopwords.words("english"))
 
-        # logger.info("loading dis to basic")
+        logger.info("loading dis_to_basic")
         self.dis_to_basic = {}
-
-        with open(dis_to_basic_path, "r") as f:
+        with open(self.dis_to_basic_path, "r") as f:
             for line in f:
                 synset_name, dis = line.strip().split(" ")
                 self.dis_to_basic[synset_name] = int(dis)
         max_dis = max(self.dis_to_basic.values())
         self.dis_to_difficulty = {i: math.log(i + 1) / math.log(max_dis + 1) for i in range(max_dis + 1)}
 
-        # logger.info("loading word freq")
+        logger.info("loading word_freq")
         self.word_log_freq = {}
-
-        with open(word_freq_path, "r") as f:
+        with open(self.word_freq_path, "r") as f:
             for line in f:
                 word, freq = line.strip().split(" ")
                 self.word_log_freq[word] = math.log(int(freq))
 
-        self.freq_scaling_factor = freq_scaling_factor
-        self.power_mean_alpha = power_mean_alpha
-        self.agg_top_quantile = agg_top_quantile
-        self.agg_top_weight = agg_top_weight
-        self.noun_weight = noun_weight
-
-        # logger.info("calculating freq center")
-        self.log_freq_center = log_freq_center
-        logger.info("initialized")
+        logger.info("calculating log_freq center")
+        if self.log_freq_center is None:
+            with open(self.basic_words_path, "r") as f:
+                basic_words = [line.strip() for line in f.readlines()]
+            basic_log_freqs = sorted(self.word_log_freq[word] for word in basic_words)
+            self.log_freq_center = basic_log_freqs[int(len(basic_log_freqs) * self.log_freq_quantile)]
 
     def is_valid_word(self, word: str) -> bool:
         if len(word) <= 1:
@@ -125,15 +138,14 @@ class FcdCalculator(PipelineStep):
                 synsets = wn.synsets(word, pos=wn.NOUN)
                 synset = synsets[0] if len(synsets) else None
                 # logger.debug(f"{word}, {pos}, {synset}")
+
                 if synset and synset.name() in self.dis_to_basic:
                     concept_dis = self.dis_to_basic[synset.name()]
                 else:
-                    concept_dis = 2
+                    concept_dis = 2  # unknown word's default semantic distance
                 concept_difficulty = self.dis_to_difficulty[concept_dis]
                 freq_difficulty = calc_freq_difficulty(self.word_log_freq.get(word.lower(), 0), self.freq_scaling_factor, self.log_freq_center)
-                score = (concept_difficulty * freq_difficulty) ** 0.5
-                # score = freq_difficulty  # ablation
-                # score = concept_difficulty # ablation
+                score = (freq_difficulty ** self.w_f) * (concept_difficulty ** (1 - self.w_f))
                 noun_scores.append((score, word))
             else:
                 freq_difficulty = calc_freq_difficulty(self.word_log_freq.get(word.lower(), 0), self.freq_scaling_factor, self.log_freq_center)
@@ -142,8 +154,7 @@ class FcdCalculator(PipelineStep):
         return noun_scores, non_noun_scores
 
     def run(self, data: DocumentsPipeline, rank: int = 0, world_size: int = 1):
-        if self.kwargs.get("nltk_path") is not None:
-            nltk.data.path.append(self.kwargs["nltk_path"])
+        self.init_dict()
         with self.track_time():
             difficulty_list = []
             for i, doc in enumerate(data, 1):
