@@ -1,1 +1,1 @@
-from .freq_conc_difficulty import FcdCalculator
+from .fcd_calculator import FcdCalculator
