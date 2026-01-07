@@ -52,7 +52,7 @@ class FcdCalculator(PipelineStep):
         self,
         output_folder: DataFolderLike,
         freq_scaling_factor=0.7,
-        log_freq_center=None,  # math.log(36597166),
+        log_freq_center=None,
         log_freq_quantile=0.1,
         basic_words_path=os.path.join(os.path.dirname(__file__), "build_dict", "data", "basic_words.txt"),
         dis_to_basic_path=os.path.join(os.path.dirname(__file__), "build_dict", "data", "dis_to_basic.txt"),
@@ -107,6 +107,7 @@ class FcdCalculator(PipelineStep):
                 basic_words = [line.strip() for line in f.readlines()]
             basic_log_freqs = sorted(self.word_log_freq[word] for word in basic_words)
             self.log_freq_center = basic_log_freqs[int(len(basic_log_freqs) * self.log_freq_quantile)]
+            # logger.debug(f"log_freq_center: {self.log_freq_center}, {math.exp(self.log_freq_center)}")
 
     def is_valid_word(self, word: str) -> bool:
         if len(word) <= 1:
