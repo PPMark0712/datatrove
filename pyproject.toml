@@ -30,9 +30,21 @@ dependencies = [
     "multiprocess",
     "numpy>=2.0.0",
     "tqdm",
+    "orjson",
+    "pyarrow",
+    "tokenizers",
+    "nltk",
+    "jieba",
 ]
 
 [project.optional-dependencies]
+gpu = [
+  "ltp",
+]
+webui = [
+  "gradio>=4.0",
+  "matplotlib",
+]
 cli = [
   "rich",
 ]
@@ -111,13 +123,6 @@ testing = [
   "moto[s3,server]",
   "spacy[ja]"
 ]
-cdf_gc = [
-  "datatrove[io]",
-  "datatrove[processing]",
-  "ltp",
-  "nltk",
-  "jieba",
-]
 ppl = [
   "datatrove[io]",
   "datatrove[processing]",
@@ -126,7 +131,6 @@ ppl = [
 all = [
   "datatrove[quality]",
   "datatrove[testing]",
-  "datatrove[cdf_gc]",
   "datatrove[ppl]"
 ]
 dev = [
