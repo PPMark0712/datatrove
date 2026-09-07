@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # ============================================================
 # Datatrove WebUI 启动脚本
 # ============================================================
@@ -14,4 +15,12 @@ export WEBUI_PORT=7860
 # export CUDA_VISIBLE_DEVICES=0,1,2,3
 
 cd "$(dirname "$0")"
+
+if ! command -v python &> /dev/null; then
+    echo "Error: python not found. Please activate your conda environment first."
+    exit 1
+fi
+
+echo "Starting Datatrove WebUI on port ${WEBUI_PORT}..."
+echo "Login: $(echo "${WEBUI_AUTH}" | cut -d: -f1):****"
 python app.py
