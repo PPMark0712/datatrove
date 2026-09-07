@@ -2,7 +2,7 @@ import os
 
 import nltk
 
-from datatrove.executor.local import LocalPipelineExecutor
+from datatrove.executor import LocalPipelineExecutor
 from datatrove.pipeline.readers import JsonlReader
 from datatrove.pipeline.fcd import FcdCalculator
 from datatrove.utils.common_argparser import get_common_argparser

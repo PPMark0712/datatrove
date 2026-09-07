@@ -27,7 +27,10 @@ def get_args():
     parser.add_argument("--sample_rate", type=float, required=True)
     parser.add_argument("--rate_for_hard_sample", type=float, default=0.4)
     args = parser.parse_args()
-    args.n_gpus = len(os.environ.get("CUDA_VISIBLE_DEVICES", "").split(","))
+    devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+    args.n_gpus = len(devices.split(",")) if devices.strip() else 0
+    if args.n_gpus == 0:
+        raise RuntimeError("CUDA_VISIBLE_DEVICES is not set. CDF-GC requires GPU for dependency parsing.")
     return args
 
 

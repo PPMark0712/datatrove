@@ -9,7 +9,18 @@
 ```bash
 conda create -n datatrove python=3.12
 conda activate datatrove
+
+# 基础安装（FCD + 采样 + 合并拆分）
 pip install -e .
+
+# 含 WebUI
+pip install -e ".[webui]"
+
+# 含 GPU 功能（CDF-GC 依存分析）
+pip install -e ".[webui,gpu]"
+
+# 含数据清洗（语言过滤需要 fasttext）
+pip install -e ".[processing]"
 ```
 
 ## 扩展功能
@@ -106,7 +117,7 @@ python scripts/merge_split/merge.py \
 
 ## 通用参数
 
-大多数脚本共享以下参数：
+大多数脚本共享以下参数（`merge.py` 使用独立参数，见 `--help`）：
 
 | 参数 | 说明 | 默认值 |
 |------|------|--------|

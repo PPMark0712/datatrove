@@ -55,6 +55,8 @@ class BaseSampler(PipelineStep, ABC):
         return sorted_indexes
 
     def run(self, data: DocumentsPipeline = None, rank: int = 0, world_size: int = 1) -> DocumentsPipeline:
+        if data is None:
+            return
         with self.track_time():
             sampled_indexes = self.get_sampled_indexes(rank, world_size)
             sorted_indexes = self._normalize_indexes(sampled_indexes)

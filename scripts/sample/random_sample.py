@@ -13,6 +13,7 @@ def get_args():
     parser.add_argument("--sample_rate", type=float, required=True)
     parser.add_argument("--unit", type=str, default="doc", choices=["doc", "token"])
     parser.add_argument("--token_count_path", type=str, default=None)
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
     assert 0 <= args.sample_rate <= 1, "sample_rate must be between 0 and 1"
     return args
@@ -56,7 +57,8 @@ def main():
                 sample_rate=args.sample_rate,
                 count_folder=count_path,
                 unit=args.unit,
-                token_count_folder=args.token_count_path
+                token_count_folder=args.token_count_path,
+                seed=args.seed,
             ),
             JsonlWriter(
                 output_folder=result_path,

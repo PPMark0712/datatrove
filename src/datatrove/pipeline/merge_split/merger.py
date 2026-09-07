@@ -72,7 +72,6 @@ class FileMerger(PipelineStep):
         start_line = sum(output_sizes[:start_output_idx])
         end_line = sum(output_sizes[:end_output_idx])
         for output_idx in range(start_output_idx, end_output_idx):
-            self.output_folder.open(f"{output_idx:05d}.jsonl", "ab").close()
             if output_sizes[output_idx] == 0:
                 with self.output_folder.open(f"{output_idx:05d}.jsonl", "wb"):
                     pass

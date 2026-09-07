@@ -4,6 +4,7 @@ import shutil
 import uuid
 import glob as glob_module
 import subprocess
+import tempfile
 import threading
 import time
 
@@ -19,7 +20,13 @@ MAX_ROWS_PER_FILE = 5000
 
 class Task:
     def __init__(self, task_id: str = None):
-        self.task_id = task_id or str(uuid.uuid4())[:8]
+        if task_id:
+            self.task_id = task_id
+        else:
+            tid = str(uuid.uuid4())[:8]
+            while os.path.exists(os.path.join(TASKS_DIR, tid)):
+                tid = str(uuid.uuid4())[:8]
+            self.task_id = tid
         self.task_dir = os.path.join(TASKS_DIR, self.task_id)
         self.input_dir = os.path.join(self.task_dir, "input")
         self.split_dir = os.path.join(self.task_dir, "split")
@@ -36,29 +43,39 @@ class Task:
 
     def set_status(self, status: str, step: str = "", detail: str = ""):
         info = {"status": status, "step": step, "detail": detail, "timestamp": time.time()}
-        with open(self.status_file, "w") as f:
-            json.dump(info, f)
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=self.task_dir, suffix=".tmp")
+        try:
+            with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+                json.dump(info, f)
+            os.replace(tmp_path, self.status_file)
+        except Exception:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+            raise
 
     def get_status(self) -> dict:
         if not os.path.exists(self.status_file):
             return {"status": "unknown"}
-        with open(self.status_file) as f:
-            return json.load(f)
+        try:
+            with open(self.status_file, encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return {"status": "unknown"}
 
     def save_config(self, config: dict):
-        with open(self.config_file, "w") as f:
+        with open(self.config_file, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
 
     def load_config(self) -> dict:
         if not os.path.exists(self.config_file):
             return {}
-        with open(self.config_file) as f:
+        with open(self.config_file, encoding="utf-8") as f:
             return json.load(f)
 
     def get_log(self) -> str:
         if not os.path.exists(self.log_file):
             return ""
-        with open(self.log_file, "r") as f:
+        with open(self.log_file, "r", encoding="utf-8", errors="replace") as f:
             return f.read()
 
     def count_input_files(self) -> int:
@@ -67,7 +84,7 @@ class Task:
     def count_input_rows(self) -> int:
         total = 0
         for f in glob_module.glob(os.path.join(self.input_dir, "*.jsonl")):
-            with open(f) as fh:
+            with open(f, encoding="utf-8", errors="replace") as fh:
                 total += sum(1 for _ in fh)
         return total
 
@@ -78,6 +95,8 @@ class Task:
         return len(glob_module.glob(os.path.join(result_dir, "*.jsonl")))
 
     def get_output_archive(self) -> str:
+        if not os.path.isdir(self.output_dir) or not os.listdir(self.output_dir):
+            return ""
         archive_path = os.path.join(self.task_dir, f"result_{self.task_id}")
         shutil.make_archive(archive_path, "zip", self.output_dir)
         return archive_path + ".zip"
@@ -105,11 +124,11 @@ def receive_directory(dir_path: str, task_id: str = None) -> Task:
     return task
 
 
-def run_script(cmd: list, log_file: str, env: dict = None) -> int:
+def run_script(cmd: list, log_file: str, env: dict = None, timeout: int = None) -> int:
     full_env = os.environ.copy()
     if env:
         full_env.update(env)
-    with open(log_file, "a") as log:
+    with open(log_file, "a", encoding="utf-8") as log:
         log.write(f"\n{'='*60}\n")
         log.write(f"[CMD] {' '.join(cmd)}\n")
         log.write(f"{'='*60}\n")
@@ -118,7 +137,12 @@ def run_script(cmd: list, log_file: str, env: dict = None) -> int:
             cmd, stdout=log, stderr=subprocess.STDOUT,
             env=full_env, cwd=PROJECT_ROOT
         )
-        proc.wait()
+        try:
+            proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+            log.write(f"\n[TIMEOUT] Process killed after {timeout}s\n")
         log.write(f"\n[EXIT CODE] {proc.returncode}\n")
     return proc.returncode
 
@@ -129,6 +153,9 @@ def step_split(task: Task, workers: int = 4):
     if n_input == 0:
         task.set_status("error", "split", "No input data found")
         return False
+    if n_input <= MAX_ROWS_PER_FILE:
+        task.set_status("running", "split", f"Skip split: {n_input} rows fits in one file")
+        return True
     n_tasks = task.count_input_files()
     cmd = [
         "python", os.path.join(SCRIPTS_DIR, "merge_split", "split.py"),
@@ -328,7 +355,6 @@ def step_merge_output(task: Task, result_dir: str, workers: int = 4):
 
 
 def find_deepest_output(base_dir: str) -> str:
-    """Find the deepest 'output' or 'result' directory containing jsonl files."""
     for name in ["output", "result", "2_sample_result"]:
         for root, dirs, files in os.walk(base_dir):
             if os.path.basename(root) == name:
@@ -341,7 +367,6 @@ def find_deepest_output(base_dir: str) -> str:
 
 
 def run_pipeline(task: Task, config: dict, workers: int = 8):
-    """Execute the full pipeline based on config."""
     task.save_config(config)
     steps = config.get("steps", [])
     current_input_dir = get_split_input_dir(task)
@@ -381,8 +406,8 @@ def run_pipeline(task: Task, config: dict, workers: int = 8):
         task.set_status("completed", detail="Pipeline finished successfully")
     except Exception as e:
         task.set_status("error", detail=str(e))
-        with open(task.log_file, "a") as f:
-            import traceback
+        import traceback
+        with open(task.log_file, "a", encoding="utf-8") as f:
             f.write(f"\n[EXCEPTION]\n{traceback.format_exc()}\n")
 
 
@@ -393,7 +418,6 @@ def run_pipeline_async(task: Task, config: dict, workers: int = 8):
 
 
 def load_scores(task: Task, score_type: str = "fcd") -> list:
-    """Load all scores from a task's score directory."""
     if score_type == "fcd":
         score_dir = os.path.join(task.work_dir, "fcd", "fcd_score")
     elif score_type == "gc":
@@ -404,7 +428,7 @@ def load_scores(task: Task, score_type: str = "fcd") -> list:
         return []
     scores = []
     for f in sorted(glob_module.glob(os.path.join(score_dir, "*.jsonl"))):
-        with open(f) as fh:
+        with open(f, encoding="utf-8", errors="replace") as fh:
             for line in fh:
                 try:
                     item = json.loads(line)
@@ -421,42 +445,46 @@ def load_scores(task: Task, score_type: str = "fcd") -> list:
 
 
 def plot_score_distribution(scores: list, title: str = "Score Distribution"):
-    """Generate PDF + CDF plot from scores. Returns a matplotlib Figure."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     import numpy as np
 
     if not scores:
-        fig, ax = plt.subplots()
-        ax.text(0.5, 0.5, "No scores available", ha="center", va="center", transform=ax.transAxes)
+        fig, ax = plt.subplots(figsize=(8, 3))
+        ax.text(0.5, 0.5, "No scores available", ha="center", va="center",
+                transform=ax.transAxes, fontsize=12, color="#9ca3af")
+        ax.set_facecolor("#fafafa")
+        ax.set_xticks([])
+        ax.set_yticks([])
         return fig
 
     scores = np.array(scores)
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
 
-    # PDF (histogram + KDE-like smooth)
-    ax1.hist(scores, bins=80, density=True, alpha=0.6, color="#4C72B0", edgecolor="white", linewidth=0.3)
-    ax1.set_xlabel("Score")
-    ax1.set_ylabel("Density")
-    ax1.set_title(f"{title} — PDF")
+    ax1.hist(scores, bins=80, density=True, alpha=0.7, color="#4f46e5", edgecolor="white", linewidth=0.4)
+    ax1.set_xlabel("Score", fontsize=10)
+    ax1.set_ylabel("Density", fontsize=10)
+    ax1.set_title(f"{title} — PDF", fontsize=11, fontweight="bold")
+    ax1.spines["top"].set_visible(False)
+    ax1.spines["right"].set_visible(False)
 
-    # CDF
     sorted_scores = np.sort(scores)
     cdf = np.arange(1, len(sorted_scores) + 1) / len(sorted_scores)
-    ax2.plot(sorted_scores, cdf, color="#C44E52", linewidth=1.5)
-    ax2.set_xlabel("Score")
-    ax2.set_ylabel("CDF")
-    ax2.set_title(f"{title} — CDF")
-    ax2.grid(True, alpha=0.3)
+    ax2.plot(sorted_scores, cdf, color="#dc2626", linewidth=1.5)
+    ax2.set_xlabel("Score", fontsize=10)
+    ax2.set_ylabel("CDF", fontsize=10)
+    ax2.set_title(f"{title} — CDF", fontsize=11, fontweight="bold")
+    ax2.grid(True, alpha=0.2)
+    ax2.spines["top"].set_visible(False)
+    ax2.spines["right"].set_visible(False)
 
-    # Stats annotation
-    stats_text = f"n={len(scores)}\nmean={scores.mean():.4f}\nstd={scores.std():.4f}\nmedian={np.median(scores):.4f}"
+    stats_text = f"n={len(scores):,}\nmean={scores.mean():.4f}\nstd={scores.std():.4f}\nmedian={np.median(scores):.4f}"
     ax1.text(0.97, 0.97, stats_text, transform=ax1.transAxes, fontsize=8,
              verticalalignment="top", horizontalalignment="right",
-             bbox=dict(boxstyle="round,pad=0.3", facecolor="wheat", alpha=0.5))
+             bbox=dict(boxstyle="round,pad=0.4", facecolor="#f0f0ff", alpha=0.8, edgecolor="#c7d2fe"))
 
-    fig.tight_layout()
+    fig.tight_layout(pad=2.0)
     return fig
 
 

@@ -112,10 +112,10 @@ python scripts/sample/random_sample.py \
 | `--sample_rate` | 采样比例 (0,1] | 全部 |
 | `--unit` | 采样单位：`doc` 或 `token` | 全部 |
 | `--score_path` | 预计算分数目录 | CDF, Hard |
-| `--token_count_folder` | token 数目录（token 模式必填） | 全部 |
-| `--seed` | 随机种子 | CDF, Random |
-| `--lower_is_better` | 分数越低越好 | Hard |
-| `--hard_sample_ratio` | Hard 段占比（CDF Balanced） | CDF |
+| `--token_count_path` | token 数目录（token 模式必填） | 全部 |
+| `--seed` | 随机种子（默认 42） | CDF, Random |
+| `--lower_is_better` | 分数越低越好（默认 False，即分数越高越好） | Hard |
+| `--hard_sample_ratio` | Hard 段占比，默认 0.4（CDF Balanced） | CDF |
 
 ## 架构设计
 

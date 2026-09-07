@@ -12,7 +12,8 @@ class IndexCdfSampler(BaseIndexSampler):
         super().__init__()
         self.sample_rate = sample_rate
         self.reverse = reverse
-        assert self.sample_rate <= 0.5
+        if self.sample_rate > 0.5:
+            raise ValueError(f"IndexCdfSampler requires sample_rate <= 0.5, got {self.sample_rate}")
 
     def sample_by_doc_count(self, indexes: List[int]) -> List[int]:
         if self.reverse:
@@ -33,22 +34,22 @@ class IndexCdfSampler(BaseIndexSampler):
             indexes = indexes[::-1]
         n = len(indexes)
         total_tokens = sum(token_counts[i] for i in indexes)
-        sample_tokens =  int(n * self.sample_rate)
+        sample_tokens = int(total_tokens * self.sample_rate)
         expected_tokens = 0
         accumulated_tokens = 0
         for i in indexes:
-            accumulated_tokens += tokens[i]
+            accumulated_tokens += token_counts[i]
             prob = accumulated_tokens / total_tokens
-            expected_tokens += prob * tokens[i]
+            expected_tokens += prob * token_counts[i]
 
-        r = sample_tokens / expected_tokens
+        r = sample_tokens / expected_tokens if expected_tokens > 0 else 0
         sampled_indexes = []
         accumulated_tokens = 0
         for i in indexes:
-            accumulated_tokens += tokens[i]
+            accumulated_tokens += token_counts[i]
             prob = r * accumulated_tokens / total_tokens
             if random.uniform(0, 1) <= prob:
-                sampled_indexes.append(idx)
+                sampled_indexes.append(i)
         return sampled_indexes
 
 
@@ -84,7 +85,8 @@ class IndexCdfBalancedSampler(BaseIndexSampler):
 
         if hard_sample_split_index > 0:
             cdf_sample_split = indexes[:hard_sample_split_index]
-            cdf_sampler = IndexCdfSampler(cdf_sample_count / len(cdf_sample_split))
+            cdf_rate = min(cdf_sample_count / len(cdf_sample_split), 0.5)
+            cdf_sampler = IndexCdfSampler(cdf_rate)
             cdf_sample_result = cdf_sampler.sample_by_doc_count(cdf_sample_split)
         else:
             cdf_sample_result = []
@@ -103,10 +105,10 @@ class IndexCdfBalancedSampler(BaseIndexSampler):
         accumulated_tokens = 0
         hard_sample_split_index = n
         for i in reversed(range(n)):
-            accumulated_tokens += token_counts[i]
+            accumulated_tokens += token_counts[indexes[i]]
             if accumulated_tokens >= hard_sample_tokens:
+                hard_sample_split_index = i
                 break
-            hard_sample_split_index = i
 
         if hard_sample_split_index < n:
             hard_sample_split = indexes[hard_sample_split_index:]
@@ -119,8 +121,9 @@ class IndexCdfBalancedSampler(BaseIndexSampler):
         if hard_sample_split_index > 0:
             cdf_sample_split = indexes[:hard_sample_split_index]
             sum_tokens = sum(token_counts[i] for i in cdf_sample_split)
-            cdf_sampler = IndexCdfSampler(cdf_sample_tokens / sum_tokens)
-            cdf_sample_result = cdf_sampler.sample_by_doc_count(cdf_sample_split)
+            cdf_rate = min(cdf_sample_tokens / sum_tokens, 0.5)
+            cdf_sampler = IndexCdfSampler(cdf_rate)
+            cdf_sample_result = cdf_sampler.sample_by_token_limit(cdf_sample_split, token_counts)
         else:
             cdf_sample_result = []
 
@@ -128,7 +131,7 @@ class IndexCdfBalancedSampler(BaseIndexSampler):
 
 
 class CdfSampler(BaseSampler):
-    """Sample data with highest score."""
+    """Sample data with CDF-based probability."""
     type = "Sampler"
     name = "CDF Sampler"
 
@@ -163,3 +166,5 @@ class CdfSampler(BaseSampler):
         elif self.unit == "token":
             token_counts = read_score_file(self.token_count_folder, rank)
             return index_sampler.sample_by_token_limit(indexes, token_counts)
+        else:
+            raise ValueError(f"Unknown unit: {self.unit}")

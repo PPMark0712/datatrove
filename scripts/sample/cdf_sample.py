@@ -14,6 +14,8 @@ def get_args():
     parser.add_argument("--sample_rate", type=float, required=True)
     parser.add_argument("--unit", type=str, default="doc", choices=["doc", "token"])
     parser.add_argument("--token_count_path", type=str, default=None)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--hard_sample_ratio", type=float, default=0.4)
     args = parser.parse_args()
     return args
 
@@ -35,8 +37,10 @@ def main():
             CdfSampler(
                 score_folder=args.score_path,
                 sample_rate=args.sample_rate,
+                hard_sample_ratio=args.hard_sample_ratio,
                 unit=args.unit,
-                token_count_folder=args.token_count_path
+                token_count_folder=args.token_count_path,
+                seed=args.seed,
             ),
             JsonlWriter(
                 output_folder=result_path,
