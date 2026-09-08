@@ -14,7 +14,7 @@ from datatrove.pipeline.filters import (
     LambdaFilter
 )
 from datatrove.pipeline.formatters import PIIFormatter
-from datatrove.pipeline.readers import JsonlReader,ParquetReader
+from datatrove.pipeline.readers import JsonlReader
 from datatrove.pipeline.tokens import TokensCounter
 from datatrove.pipeline.writers.jsonl import JsonlWriter
 from datatrove.utils.hashing import HashConfig
@@ -64,6 +64,7 @@ def wudao_adapter(self, data: dict, path: str, id_in_file: int | str):
 def get_args():
     parser = get_common_argparser()
     parser.add_argument("--languages", nargs="+", default=["zh"])
+    parser.add_argument("--tokenizer_path", type=str, default=None)
     args = parser.parse_args()
     return args
 
@@ -90,12 +91,11 @@ def main():
     
     language_filter_executor = LocalPipelineExecutor(
         pipeline=[
-            ParquetReader(
+            JsonlReader(
                 args.input_path,
                 glob_pattern=args.glob_pattern,
                 adapter=raw_input_adapter,
                 limit=args.limit,
-                adapter=wudao_adapter,
             ),
             LanguageFilter(
                 languages=args.languages,
@@ -259,10 +259,12 @@ def main():
             depends=minhash_buckets_executor,
         )
 
-        minhash_filter_executor = LocalPipelineExecutor(
-            pipeline=[
+        minhash_filter_pipeline = [
                 MINHASH_INPUT_READER,
-                TokensCounter("/data1/yyz/downloads/models/NousResearch/Llama-3.2-1B/tokenizer.json"),
+        ]
+        if args.tokenizer_path:
+            minhash_filter_pipeline.append(TokensCounter(args.tokenizer_path))
+        minhash_filter_pipeline.extend([
                 MinhashDedupFilter(
                     input_folder=MINHASH_REMOVE_IDS_PATH,
                     exclusion_writer=JsonlWriter(
@@ -277,7 +279,10 @@ def main():
                     adapter=output_adapter,
                     compression=None
                 )
-            ],
+        ])
+
+        minhash_filter_executor = LocalPipelineExecutor(
+            pipeline=minhash_filter_pipeline,
             tasks=args.tasks,
             logging_dir=os.path.join(LOG_PATH, "3_minhash_deduplication", language, "4_filter"),
             skip_completed=not args.rerun,
