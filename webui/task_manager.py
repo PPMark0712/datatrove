@@ -1,19 +1,21 @@
 import os
 import json
 import shutil
-import uuid
 import glob as glob_module
 import subprocess
 import tempfile
 import threading
 import time
+import zipfile
 
 
 WEBUI_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(WEBUI_DIR)
 SCRIPTS_DIR = os.path.join(PROJECT_ROOT, "scripts")
 TASKS_DIR = os.path.join(WEBUI_DIR, "tasks")
+WORKSPACE_DIR = os.path.join(WEBUI_DIR, "workspace")
 os.makedirs(TASKS_DIR, exist_ok=True)
+os.makedirs(WORKSPACE_DIR, exist_ok=True)
 
 MAX_ROWS_PER_FILE = 5000
 
@@ -23,10 +25,7 @@ class Task:
         if task_id:
             self.task_id = task_id
         else:
-            tid = str(uuid.uuid4())[:8]
-            while os.path.exists(os.path.join(TASKS_DIR, tid)):
-                tid = str(uuid.uuid4())[:8]
-            self.task_id = tid
+            self.task_id = self._next_task_id()
         self.task_dir = os.path.join(TASKS_DIR, self.task_id)
         self.input_dir = os.path.join(self.task_dir, "input")
         self.split_dir = os.path.join(self.task_dir, "split")
@@ -35,6 +34,19 @@ class Task:
         self.log_file = os.path.join(self.task_dir, "task.log")
         self.config_file = os.path.join(self.task_dir, "config.json")
         self.status_file = os.path.join(self.task_dir, "status.json")
+        self.name_file = os.path.join(self.task_dir, "name.txt")
+
+    @staticmethod
+    def _next_task_id() -> str:
+        nums = []
+        if os.path.exists(TASKS_DIR):
+            for d in os.listdir(TASKS_DIR):
+                if os.path.isdir(os.path.join(TASKS_DIR, d)) and d.startswith("task_"):
+                    try:
+                        nums.append(int(d.split("_", 1)[1]))
+                    except ValueError:
+                        pass
+        return f"task_{max(nums, default=0) + 1}"
 
     def init(self):
         for d in [self.task_dir, self.input_dir, self.split_dir, self.work_dir, self.output_dir]:
@@ -71,6 +83,24 @@ class Task:
             return {}
         with open(self.config_file, encoding="utf-8") as f:
             return json.load(f)
+
+    def get_display_name(self) -> str:
+        if os.path.exists(self.name_file):
+            with open(self.name_file, "r", encoding="utf-8") as f:
+                name = f.read().strip()
+                if name:
+                    return name
+        if self.task_id.startswith("task_"):
+            return f"任务 {self.task_id.split('_', 1)[1]}"
+        return self.task_id
+
+    def set_display_name(self, name: str):
+        os.makedirs(self.task_dir, exist_ok=True)
+        with open(self.name_file, "w", encoding="utf-8") as f:
+            f.write(name.strip())
+
+    def stop(self):
+        self.set_status("stopped", detail="Stopped by user")
 
     def get_log(self) -> str:
         if not os.path.exists(self.log_file):
@@ -488,6 +518,14 @@ def plot_score_distribution(scores: list, title: str = "Score Distribution"):
     return fig
 
 
+def delete_task(task_id: str) -> bool:
+    task_dir = os.path.join(TASKS_DIR, task_id)
+    if not os.path.exists(task_dir):
+        return False
+    shutil.rmtree(task_dir, ignore_errors=True)
+    return True
+
+
 def list_tasks() -> list:
     tasks = []
     if not os.path.exists(TASKS_DIR):
@@ -503,5 +541,107 @@ def list_tasks() -> list:
             "status": status.get("status", "unknown"),
             "step": status.get("step", ""),
             "detail": status.get("detail", ""),
+            "display_name": t.get_display_name(),
         })
     return tasks
+
+
+# ── Workspace management ──
+
+def stage_upload(files=None, dir_path=None) -> str:
+    """Copy uploaded files to a staging directory. Returns staging path."""
+    staging = tempfile.mkdtemp(dir=WORKSPACE_DIR, prefix=".staging_")
+    if files:
+        for f in files:
+            fname = f.name if hasattr(f, "name") else str(f)
+            basename = os.path.basename(fname)
+            if basename.lower().endswith(".zip"):
+                with zipfile.ZipFile(fname) as zf:
+                    for member in zf.namelist():
+                        if member.endswith(".jsonl") and "__MACOSX" not in member:
+                            target = os.path.join(staging, os.path.basename(member))
+                            with zf.open(member) as src_f, open(target, "wb") as dst_f:
+                                shutil.copyfileobj(src_f, dst_f)
+            else:
+                shutil.copy2(fname, os.path.join(staging, basename))
+    elif dir_path and os.path.isdir(dir_path):
+        for f in glob_module.glob(os.path.join(dir_path, "*.jsonl")):
+            shutil.copy2(f, os.path.join(staging, os.path.basename(f)))
+    return staging
+
+
+def confirm_upload(staging_dir: str, name: str) -> str:
+    """Move staged files to workspace under the given name. Returns final name."""
+    name = name.strip().replace(" ", "_") if name else time.strftime("%Y%m%d_%H%M%S")
+    dest = os.path.join(WORKSPACE_DIR, name)
+    if os.path.exists(dest):
+        i = 1
+        while os.path.exists(f"{dest}_{i}"):
+            i += 1
+        dest = f"{dest}_{i}"
+        name = os.path.basename(dest)
+    os.rename(staging_dir, dest)
+    return name
+
+
+def cancel_upload(staging_dir: str):
+    """Remove staged files."""
+    if staging_dir and os.path.exists(staging_dir):
+        shutil.rmtree(staging_dir, ignore_errors=True)
+
+
+def rename_dataset(old_name: str, new_name: str) -> bool:
+    """Rename a workspace dataset directory."""
+    if not old_name or not new_name or old_name == new_name:
+        return False
+    old_path = os.path.join(WORKSPACE_DIR, old_name)
+    new_path = os.path.join(WORKSPACE_DIR, new_name)
+    if not os.path.exists(old_path) or os.path.exists(new_path):
+        return False
+    os.rename(old_path, new_path)
+    return True
+
+
+def list_workspace_datasets():
+    datasets = []
+    if not os.path.exists(WORKSPACE_DIR):
+        return datasets
+    for name in sorted(os.listdir(WORKSPACE_DIR), reverse=True):
+        if name.startswith("."):
+            continue
+        dpath = os.path.join(WORKSPACE_DIR, name)
+        if not os.path.isdir(dpath):
+            continue
+        files = glob_module.glob(os.path.join(dpath, "*.jsonl"))
+        if not files:
+            continue
+        datasets.append({"name": name, "n_files": len(files), "path": dpath})
+    return datasets
+
+
+def create_task_from_workspace(dataset_name: str) -> Task:
+    task = Task()
+    task.init()
+    src = os.path.join(WORKSPACE_DIR, dataset_name)
+    if os.path.isdir(src):
+        for f in glob_module.glob(os.path.join(src, "*.jsonl")):
+            shutil.copy2(f, os.path.join(task.input_dir, os.path.basename(f)))
+    return task
+
+
+def save_output_as_dataset(task: Task, dataset_name: str) -> str:
+    dataset_name = dataset_name.strip().replace(" ", "_") if dataset_name else f"result_{task.task_id}"
+    dest = os.path.join(WORKSPACE_DIR, dataset_name)
+    if os.path.exists(dest):
+        i = 1
+        while os.path.exists(f"{dest}_{i}"):
+            i += 1
+        dest = f"{dest}_{i}"
+        dataset_name = os.path.basename(dest)
+    os.makedirs(dest, exist_ok=True)
+    jsonl_files = glob_module.glob(os.path.join(task.output_dir, "*.jsonl"))
+    if not jsonl_files:
+        return ""
+    for f in jsonl_files:
+        shutil.copy2(f, os.path.join(dest, os.path.basename(f)))
+    return dataset_name

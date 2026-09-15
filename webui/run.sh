@@ -6,7 +6,8 @@ set -euo pipefail
 
 # 账号密码设置（格式: "用户名:密码"，多个用逗号分隔）
 # 例: "admin:mypass123,guest:guest456"
-export WEBUI_AUTH="admin:datatrove2024"
+# export WEBUI_AUTH="admin:datatrove2024"
+export WEBUI_AUTH="1:1"
 
 # 服务端口
 export WEBUI_PORT=7860

@@ -161,3 +161,8 @@ cython_debug/
 .vscode/
 
 playground/
+
+# WebUI runtime data
+webui/workspace/
+webui/tasks/
+webui/test_data/
