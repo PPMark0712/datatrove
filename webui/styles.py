@@ -63,22 +63,39 @@ footer { display: none !important; }
     flex: 1 1 0% !important;
     max-height: 50% !important;
     min-height: 0 !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    padding: 12px !important;
+    overflow: hidden !important;
+    padding: 4px 12px 8px !important;
     border-bottom: 1px solid #e2e8f0;
-    gap: 4px !important;
+    gap: 0px !important;
+    display: flex !important;
+    flex-direction: column !important;
 }
 .sidebar-section:last-child {
     border-bottom: none;
 }
 
-/* Card list inside section fills remaining space */
+/* Section label pinned at top */
+.sidebar-label {
+    flex-shrink: 0 !important;
+    padding: 4px 0 !important;
+}
+
+/* Card list inside section scrolls */
 .card-list-wrap {
-    overflow: visible !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
 }
 .card-list-wrap .card-list {
     overflow: visible !important;
+}
+
+/* Add button and hidden bridges don't grow */
+.sidebar-section > button,
+.sidebar-section > .form,
+.sidebar-section > .gr-group {
+    flex-shrink: 0 !important;
 }
 
 /* ── Main panel — vertical layout with scroll ── */
@@ -317,6 +334,9 @@ footer { display: none !important; }
     margin: 8px 0 !important;
     position: relative;
     z-index: 10;
+}
+.add-dialog-hidden {
+    display: none !important;
 }
 /* ── Screen-reader only (visually hidden but clickable by JS) ── */
 .sr-only {

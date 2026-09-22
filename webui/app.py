@@ -124,7 +124,7 @@ GLOBAL_JS = """
         var deleteBtn = e.target.closest('.card-delete');
         if (deleteBtn) {
             var delCard = deleteBtn.closest('.task-card');
-            if (delCard) { setBridge('task-delete-bridge', delCard.dataset.id); }
+            if (delCard) { setBridge('task-delete-bridge', delCard.dataset.id + '|||' + Date.now()); }
             return;
         }
         var card = e.target.closest('.task-card');
@@ -168,6 +168,13 @@ GLOBAL_JS = """
         e.target.contentEditable = 'false';
         if (n && n !== o && card) { setBridge('task-rename-bridge', card.dataset.id + '|||' + n); }
         else { e.target.textContent = o; }
+    });
+
+    // ── Add-dialog open/close via delegation ──
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.add-dialog') && e.target.closest('button') && e.target.closest('button').textContent.trim() === '取消') {
+            document.querySelectorAll('.add-dialog').forEach(function(el) { el.classList.add('add-dialog-hidden'); });
+        }
     });
 
     console.log('[WebUI] All event handlers ready');
@@ -222,7 +229,7 @@ def build_app():
                     ds_bridge_box = gr.Textbox(value="", elem_id="ds-bridge-box", elem_classes="hidden-bridge", lines=1)
                     ds_rename_bridge_box = gr.Textbox(value="", elem_id="ds-rename-bridge", elem_classes="hidden-bridge", lines=1)
 
-                    with gr.Group(visible=False, elem_classes="add-dialog") as add_dialog:
+                    with gr.Group(elem_classes="add-dialog add-dialog-hidden") as add_dialog:
                         upload_btn = gr.UploadButton(
                             "📂 上传本地文件 (.jsonl / .zip)",
                             file_count="multiple",
@@ -412,6 +419,7 @@ def build_app():
         add_ds_btn.click(
             fn=handle_show_add_dialog,
             outputs=[add_dialog, add_name_input, upload_files, upload_info, dir_input],
+            js="() => { document.querySelectorAll('.add-dialog').forEach(el => el.classList.remove('add-dialog-hidden')); }",
         )
         upload_btn.upload(
             fn=handle_file_upload,
@@ -422,10 +430,11 @@ def build_app():
             fn=handle_confirm_add,
             inputs=[upload_files, dir_input, add_name_input],
             outputs=[add_dialog, dataset_list, current_dataset, upload_files, upload_info, dir_input, add_name_input],
+            js="() => { setTimeout(() => document.querySelectorAll('.add-dialog').forEach(el => el.classList.add('add-dialog-hidden')), 500); }",
         )
         cancel_add_btn.click(
-            fn=handle_cancel_add,
-            outputs=[add_dialog, upload_files, upload_info, dir_input, add_name_input],
+            fn=None,
+            js="() => { document.querySelectorAll('.add-dialog').forEach(el => el.classList.add('add-dialog-hidden')); }",
         )
 
         # ── Create task ──
@@ -457,7 +466,7 @@ def build_app():
         )
 
         # ── Task delete / rename ──
-        task_delete_bridge.input(
+        task_delete_bridge.change(
             fn=handle_task_delete,
             inputs=[task_delete_bridge, current_task_id],
             outputs=[

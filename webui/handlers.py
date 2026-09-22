@@ -178,7 +178,7 @@ def handle_dataset_rename(rename_str, current_dataset):
 
 
 def handle_show_add_dialog(_trigger=None):
-    return gr.Group(visible=True), _next_dataset_name(), None, "", ""
+    return gr.update(), _next_dataset_name(), None, "", ""
 
 
 def handle_file_upload(files):
@@ -214,7 +214,7 @@ def handle_confirm_add(files, dir_path, name):
         return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
     final_name = confirm_upload(staging, name.strip())
     return (
-        gr.Group(visible=False),
+        gr.update(),
         render_dataset_cards(selected=final_name),
         final_name,
         None,
@@ -225,7 +225,7 @@ def handle_confirm_add(files, dir_path, name):
 
 
 def handle_cancel_add():
-    return gr.Group(visible=False), None, "", "", ""
+    return gr.update(), None, "", "", ""
 
 
 # ═══════════════════════════════════════════
@@ -348,7 +348,7 @@ def handle_task_delete(delete_str, current_task_id):
             render_task_cards(selected=current_task_id),
             gr.update(), gr.update(), gr.update(), gr.update(), gr.update(),
         )
-    task_id = delete_str.strip()
+    task_id = delete_str.split("|||")[0].strip()
     task = Task(task_id)
     if task.get_status().get("status") == "running":
         gr.Warning("无法删除正在运行的任务")
