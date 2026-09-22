@@ -214,7 +214,7 @@ def build_app():
             with gr.Column(scale=0, min_width=300, elem_classes="sidebar"):
 
                 gr.HTML('<div class="sidebar-label">📂 数据集</div>')
-                dataset_list = gr.HTML(value=render_dataset_cards())
+                dataset_list = gr.HTML(value=render_dataset_cards(), elem_classes="card-list-wrap")
                 add_ds_btn = gr.Button("+ 添加数据集", elem_classes="card-add-btn", size="sm")
 
                 # Hidden bridge textboxes (CSS-hidden, value changes trigger .change() events)
@@ -244,7 +244,7 @@ def build_app():
                 gr.HTML('<hr style="border:none;border-top:1px solid #e2e8f0;margin:8px 0">')
 
                 gr.HTML('<div class="sidebar-label">📋 任务</div>')
-                task_list = gr.HTML(value=render_task_cards())
+                task_list = gr.HTML(value=render_task_cards(), elem_classes="card-list-wrap")
                 add_task_btn = gr.Button("+ 新建任务", elem_classes="card-add-btn", size="sm")
                 task_bridge_box = gr.Textbox(value="", elem_id="task-bridge-box", elem_classes="hidden-bridge", lines=1)
                 task_delete_bridge = gr.Textbox(value="", elem_id="task-delete-bridge", elem_classes="hidden-bridge", lines=1)

@@ -46,22 +46,44 @@ footer { display: none !important; }
     font-size: 0.82em;
 }
 
-/* ── Sidebar — fixed, independently scrollable ── */
+/* ── Sidebar — fixed height, no horizontal scroll ── */
 .sidebar {
     background: #f8fafc !important;
     border-right: 1px solid #e2e8f0 !important;
     padding: 12px !important;
-    overflow-y: auto !important;
+    overflow: hidden !important;
     flex-shrink: 0 !important;
     height: calc(100vh - 60px) !important;
+    display: flex !important;
+    flex-direction: column !important;
 }
 
-/* ── Main panel — scrollable content area ── */
+/* Card lists inside sidebar scroll vertically, constrained to available space */
+.card-list-wrap {
+    flex: 1 1 0% !important;
+    min-height: 40px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
+.card-list-wrap .card-list {
+    overflow: visible !important;
+}
+/* Sidebar labels, buttons, dividers, dialogs should not shrink */
+.sidebar > .block:not(.card-list-wrap),
+.sidebar > button,
+.sidebar > .form,
+.sidebar > .gr-group {
+    flex-shrink: 0 !important;
+}
+
+/* ── Main panel — vertical layout with scroll ── */
 .main-panel {
     padding: 0 32px 24px !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
     height: calc(100vh - 60px) !important;
+    flex: 1 1 0% !important;
+    display: block !important;
 }
 .main-panel > * {
     max-width: 100% !important;
