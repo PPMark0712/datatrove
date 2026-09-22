@@ -213,48 +213,49 @@ def build_app():
             # ── SIDEBAR ──
             with gr.Column(scale=0, min_width=300, elem_classes="sidebar"):
 
-                gr.HTML('<div class="sidebar-label">📂 数据集</div>')
-                dataset_list = gr.HTML(value=render_dataset_cards(), elem_classes="card-list-wrap")
-                add_ds_btn = gr.Button("+ 添加数据集", elem_classes="card-add-btn", size="sm")
+                # ── Dataset section (top half) ──
+                with gr.Column(elem_classes="sidebar-section"):
+                    gr.HTML('<div class="sidebar-label">📂 数据集</div>')
+                    dataset_list = gr.HTML(value=render_dataset_cards(), elem_classes="card-list-wrap")
+                    add_ds_btn = gr.Button("+ 添加数据集", elem_classes="card-add-btn", size="sm")
 
-                # Hidden bridge textboxes (CSS-hidden, value changes trigger .change() events)
-                ds_bridge_box = gr.Textbox(value="", elem_id="ds-bridge-box", elem_classes="hidden-bridge", lines=1)
-                ds_rename_bridge_box = gr.Textbox(value="", elem_id="ds-rename-bridge", elem_classes="hidden-bridge", lines=1)
+                    ds_bridge_box = gr.Textbox(value="", elem_id="ds-bridge-box", elem_classes="hidden-bridge", lines=1)
+                    ds_rename_bridge_box = gr.Textbox(value="", elem_id="ds-rename-bridge", elem_classes="hidden-bridge", lines=1)
 
-                with gr.Group(visible=False, elem_classes="add-dialog") as add_dialog:
-                    upload_btn = gr.UploadButton(
-                        "📂 上传本地文件 (.jsonl / .zip)",
-                        file_count="multiple",
-                        file_types=[".jsonl", ".zip"],
-                        size="sm",
-                        elem_classes="upload-btn",
-                    )
-                    upload_files = gr.State(None)
-                    upload_info = gr.HTML("")
-                    gr.HTML('<div class="add-dialog-divider">— 或 —</div>')
-                    dir_input = gr.Textbox(
-                        label="服务器路径", lines=1,
-                        placeholder="/data/corpus/...",
-                    )
-                    add_name_input = gr.Textbox(label="数据集名称", lines=1)
-                    with gr.Row():
-                        confirm_add_btn = gr.Button("确认", variant="primary", size="sm")
-                        cancel_add_btn = gr.Button("取消", size="sm")
+                    with gr.Group(visible=False, elem_classes="add-dialog") as add_dialog:
+                        upload_btn = gr.UploadButton(
+                            "📂 上传本地文件 (.jsonl / .zip)",
+                            file_count="multiple",
+                            file_types=[".jsonl", ".zip"],
+                            size="sm",
+                            elem_classes="upload-btn",
+                        )
+                        upload_files = gr.State(None)
+                        upload_info = gr.HTML("")
+                        gr.HTML('<div class="add-dialog-divider">— 或 —</div>')
+                        dir_input = gr.Textbox(
+                            label="服务器路径", lines=1,
+                            placeholder="/data/corpus/...",
+                        )
+                        add_name_input = gr.Textbox(label="数据集名称", lines=1)
+                        with gr.Row():
+                            confirm_add_btn = gr.Button("确认", variant="primary", size="sm")
+                            cancel_add_btn = gr.Button("取消", size="sm")
 
-                gr.HTML('<hr style="border:none;border-top:1px solid #e2e8f0;margin:8px 0">')
+                # ── Task section (bottom half) ──
+                with gr.Column(elem_classes="sidebar-section"):
+                    gr.HTML('<div class="sidebar-label">📋 任务</div>')
+                    task_list = gr.HTML(value=render_task_cards(), elem_classes="card-list-wrap")
+                    add_task_btn = gr.Button("+ 新建任务", elem_classes="card-add-btn", size="sm")
+                    task_bridge_box = gr.Textbox(value="", elem_id="task-bridge-box", elem_classes="hidden-bridge", lines=1)
+                    task_delete_bridge = gr.Textbox(value="", elem_id="task-delete-bridge", elem_classes="hidden-bridge", lines=1)
+                    task_rename_bridge = gr.Textbox(value="", elem_id="task-rename-bridge", elem_classes="hidden-bridge", lines=1)
 
-                gr.HTML('<div class="sidebar-label">📋 任务</div>')
-                task_list = gr.HTML(value=render_task_cards(), elem_classes="card-list-wrap")
-                add_task_btn = gr.Button("+ 新建任务", elem_classes="card-add-btn", size="sm")
-                task_bridge_box = gr.Textbox(value="", elem_id="task-bridge-box", elem_classes="hidden-bridge", lines=1)
-                task_delete_bridge = gr.Textbox(value="", elem_id="task-delete-bridge", elem_classes="hidden-bridge", lines=1)
-                task_rename_bridge = gr.Textbox(value="", elem_id="task-rename-bridge", elem_classes="hidden-bridge", lines=1)
-
-                with gr.Group(visible=False, elem_classes="confirm-overlay") as switch_dialog:
-                    gr.HTML('<div class="confirm-msg">⚠️ 当前任务正在运行，是否终止并切换？</div>')
-                    with gr.Row():
-                        confirm_switch_btn = gr.Button("终止并切换", variant="stop", size="sm")
-                        cancel_switch_btn = gr.Button("取消", size="sm")
+                    with gr.Group(visible=False, elem_classes="confirm-overlay") as switch_dialog:
+                        gr.HTML('<div class="confirm-msg">⚠️ 当前任务正在运行，是否终止并切换？</div>')
+                        with gr.Row():
+                            confirm_switch_btn = gr.Button("终止并切换", variant="stop", size="sm")
+                            cancel_switch_btn = gr.Button("取消", size="sm")
 
             # ── MAIN PANEL ──
             with gr.Column(scale=1, elem_classes="main-panel"):

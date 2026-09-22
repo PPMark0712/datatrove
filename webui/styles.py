@@ -46,32 +46,39 @@ footer { display: none !important; }
     font-size: 0.82em;
 }
 
-/* ── Sidebar — fixed height, vertical scroll ── */
+/* ── Sidebar — fixed height, two equal sections ── */
 .sidebar {
     background: #f8fafc !important;
     border-right: 1px solid #e2e8f0 !important;
-    padding: 12px !important;
-    overflow-x: hidden !important;
-    overflow-y: auto !important;
+    padding: 0 !important;
+    overflow: hidden !important;
     flex-shrink: 0 !important;
     height: calc(100vh - 60px) !important;
-    display: block !important;
+    display: flex !important;
+    flex-direction: column !important;
 }
 
-/* Card lists inside sidebar: cap height and scroll internally */
-.card-list-wrap {
-    max-height: 35vh !important;
+/* Each sidebar section (datasets / tasks) takes half the height */
+.sidebar-section {
+    flex: 1 1 0% !important;
+    max-height: 50% !important;
+    min-height: 0 !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
+    padding: 12px !important;
+    border-bottom: 1px solid #e2e8f0;
+    gap: 4px !important;
+}
+.sidebar-section:last-child {
+    border-bottom: none;
+}
+
+/* Card list inside section fills remaining space */
+.card-list-wrap {
+    overflow: visible !important;
 }
 .card-list-wrap .card-list {
     overflow: visible !important;
-}
-
-/* Add-dialog should also be compact */
-.add-dialog {
-    max-height: 50vh !important;
-    overflow-y: auto !important;
 }
 
 /* ── Main panel — vertical layout with scroll ── */
