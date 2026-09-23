@@ -147,8 +147,14 @@ class MinhashDedupSignature(PipelineStep):
         self._parameters = None
         self._hash_func = create_hash_func(self.config.hash_config)
         self.language = language
-        self.word_tokenizer = load_word_tokenizer(language)
+        self._word_tokenizer = None
         self.skip_existing_sigs = skip_existing_sigs
+
+    @property
+    def word_tokenizer(self):
+        if self._word_tokenizer is None:
+            self._word_tokenizer = load_word_tokenizer(self.language)
+        return self._word_tokenizer
 
     @property
     def parameters(self):

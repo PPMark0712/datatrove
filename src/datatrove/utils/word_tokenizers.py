@@ -105,7 +105,6 @@ class NLTKTokenizer(WordTokenizer):
 
 class SpaCyTokenizer(WordTokenizer):
     def __init__(self, language: str, config=None):
-        language = "zh"
         super().__init__(language)
         check_required_dependencies(f"{language} word tokenizer", ["spacy"])
         if language == "vi":
@@ -462,15 +461,18 @@ def load_tokenizer_assignments() -> dict[str, Callable[[], WordTokenizer]]:
 
             tok_factory = partial(tok_factory_wrapper, tok_class_name, tok_code)
 
+            is_default_script = default_script.upper() == "TRUE"
+            is_default_code_1 = default_code_1.upper() == "TRUE"
+
             code_3_script = f"{code_3}_{script}"
             if code_3_script not in word_tokenizer_factories:
                 word_tokenizer_factories[code_3_script] = tok_factory
-                if default_script:
+                if is_default_script:
                     word_tokenizer_factories[code_3] = tok_factory
             code_1_script = f"{code_1}_{script}"
-            if code_1 and default_code_1 and code_1_script not in word_tokenizer_factories:
+            if code_1 and is_default_code_1 and code_1_script not in word_tokenizer_factories:
                 word_tokenizer_factories[code_1_script] = tok_factory
-                if default_script:
+                if is_default_script:
                     word_tokenizer_factories[code_1] = tok_factory
     return word_tokenizer_factories
 
