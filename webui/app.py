@@ -193,7 +193,13 @@ def build_app():
     auth_dict = parse_auth(AUTH_USERS)
     need_auth = bool(auth_dict)
 
-    with gr.Blocks(title="Datatrove 数据筛选平台") as app:
+    with gr.Blocks(title="Datatrove 数据筛选平台", css=CUSTOM_CSS, theme=gr.themes.Soft(
+        primary_hue="indigo",
+        secondary_hue="slate",
+        neutral_hue="slate",
+        font=gr.themes.GoogleFont("Inter"),
+        radius_size=gr.themes.sizes.radius_md,
+    )) as app:
 
         current_dataset = gr.State("")
         current_task_id = gr.State("")
@@ -562,12 +568,4 @@ if __name__ == "__main__":
         server_name="0.0.0.0",
         server_port=port,
         share=False,
-        css=CUSTOM_CSS,
-        theme=gr.themes.Soft(
-            primary_hue="indigo",
-            secondary_hue="slate",
-            neutral_hue="slate",
-            font=gr.themes.GoogleFont("Inter"),
-            radius_size=gr.themes.sizes.radius_md,
-        ),
     )

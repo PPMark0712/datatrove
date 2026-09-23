@@ -60,32 +60,32 @@ footer { display: none !important; }
 
 /* Each sidebar section (datasets / tasks) takes half the height */
 .sidebar-section {
-    flex: 1 1 0% !important;
+    flex: 0 1 auto !important;
     max-height: 50% !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
+    min-height: 80px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
     padding: 4px 12px 8px !important;
     border-bottom: 1px solid #e2e8f0;
     gap: 0px !important;
-    display: flex !important;
-    flex-direction: column !important;
+    display: block !important;
 }
 .sidebar-section:last-child {
     border-bottom: none;
 }
 
-/* Section label pinned at top */
+/* Section label pinned via sticky */
 .sidebar-label {
-    flex-shrink: 0 !important;
+    position: sticky !important;
+    top: 0 !important;
+    background: #f8fafc !important;
+    z-index: 1 !important;
     padding: 4px 0 !important;
 }
 
-/* Card list inside section scrolls */
+/* Card list — no flex growth, natural height */
 .card-list-wrap {
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    flex: 1 1 0% !important;
-    min-height: 0 !important;
+    overflow: visible !important;
 }
 .card-list-wrap .card-list {
     overflow: visible !important;
@@ -326,7 +326,8 @@ footer { display: none !important; }
 }
 
 /* ── Add dataset dialog — fixed centered modal ── */
-.add-dialog {
+.add-dialog,
+.add-dialog > .gr-group {
     position: fixed !important;
     top: 50% !important;
     left: 50% !important;
@@ -340,6 +341,8 @@ footer { display: none !important; }
     max-width: 90vw !important;
     box-shadow: 0 0 0 9999px rgba(0,0,0,0.3), 0 20px 60px rgba(0,0,0,0.2) !important;
     margin: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
 }
 
 .add-dialog-divider {
