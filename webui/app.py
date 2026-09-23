@@ -8,6 +8,7 @@ from handlers import (
     render_dataset_cards,
     render_task_cards,
     handle_dataset_rename,
+    handle_dataset_preview,
     handle_show_add_dialog,
     handle_file_upload,
     handle_confirm_add,
@@ -60,7 +61,7 @@ def _set_bridge(elem_id):
 
 GLOBAL_JS = """
 () => {
-    console.log('[WebUI] Global JS v1 loaded');
+    console.log('[WebUI] Global JS v2 loaded');
 
     var setBridge = function(elemId, v) {
         var c = document.getElementById(elemId);
@@ -73,6 +74,17 @@ GLOBAL_JS = """
         inp.dispatchEvent(new Event('input', {bubbles: true}));
         inp.dispatchEvent(new Event('change', {bubbles: true}));
         console.log('[bridge] #' + elemId + ' =', v);
+    };
+
+    // ── Panel switching ──
+    window.switchPanel = function(mode) {
+        ['idle', 'dataset', 'task'].forEach(function(m) {
+            document.querySelectorAll('.panel-' + m).forEach(function(el) {
+                if (m === mode) el.classList.remove('panel-hidden');
+                else el.classList.add('panel-hidden');
+            });
+        });
+        console.log('[WebUI] switchPanel:', mode);
     };
 
     // ── Dataset card clicks ──
@@ -96,6 +108,7 @@ GLOBAL_JS = """
         } else {
             window.__selectedDataset = card.dataset.name;
             setBridge('ds-bridge-box', card.dataset.name);
+            window.switchPanel('dataset');
         }
     });
 
@@ -145,6 +158,7 @@ GLOBAL_JS = """
             }
         } else {
             setBridge('task-bridge-box', card.dataset.id);
+            window.switchPanel('task');
         }
     });
 
@@ -168,13 +182,6 @@ GLOBAL_JS = """
         e.target.contentEditable = 'false';
         if (n && n !== o && card) { setBridge('task-rename-bridge', card.dataset.id + '|||' + n); }
         else { e.target.textContent = o; }
-    });
-
-    // ── Add-dialog open/close via delegation ──
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.add-dialog') && e.target.closest('button') && e.target.closest('button').textContent.trim() === '取消') {
-            document.querySelectorAll('.add-dialog').forEach(function(el) { el.classList.add('add-dialog-hidden'); });
-        }
     });
 
     console.log('[WebUI] All event handlers ready');
@@ -229,11 +236,10 @@ def build_app():
                     ds_bridge_box = gr.Textbox(value="", elem_id="ds-bridge-box", elem_classes="hidden-bridge", lines=1)
                     ds_rename_bridge_box = gr.Textbox(value="", elem_id="ds-rename-bridge", elem_classes="hidden-bridge", lines=1)
 
-                    with gr.Group(elem_classes="add-dialog add-dialog-hidden") as add_dialog:
+                    with gr.Group(visible=False, elem_classes="add-dialog") as add_dialog:
                         upload_btn = gr.UploadButton(
                             "📂 上传本地文件 (.jsonl / .zip)",
                             file_count="multiple",
-                            file_types=[".jsonl", ".zip"],
                             size="sm",
                             elem_classes="upload-btn",
                         )
@@ -267,94 +273,114 @@ def build_app():
             # ── MAIN PANEL ──
             with gr.Column(scale=1, elem_classes="main-panel"):
 
-                task_header = gr.HTML(
-                    '<div class="info-banner" style="opacity:.5">'
-                    "← 在左侧选择数据集，然后新建任务开始"
-                    "</div>"
-                )
-                preview_md = gr.Markdown("", elem_classes="preview-table")
-
-                gr.HTML('<div class="section-heading">流水线配置</div>')
-
-                with gr.Accordion(
-                    "🧹 数据清洗 — 语言过滤 · 质量过滤 · 去重",
-                    open=False, elem_classes="step-accordion",
-                ):
-                    enable_clean = gr.Checkbox(label="启用", value=False)
-                    clean_languages = gr.CheckboxGroup(
-                        choices=["zh", "en"],
-                        value=["zh"],
-                        label="目标语言（可多选）",
+                # ── Panel: Idle (default) ──
+                with gr.Group(elem_classes="panel-idle"):
+                    gr.HTML(
+                        '<div class="idle-message">'
+                        '<div style="font-size:2.5em;margin-bottom:16px">📂</div>'
+                        '<div style="font-size:1.1em;font-weight:600;color:#1e293b">选择数据集开始</div>'
+                        '<div style="font-size:0.85em;color:#64748b;margin-top:8px">'
+                        '在左侧选择一个数据集，或点击"+ 添加数据集"上传新数据</div>'
+                        '</div>'
                     )
 
-                with gr.Accordion(
-                    "📊 FCD 词汇难度打分 — 英文，纯 CPU",
-                    open=False, elem_classes="step-accordion",
-                ):
-                    enable_fcd = gr.Checkbox(label="启用", value=False)
-                    with gr.Row():
-                        fcd_freq = gr.Slider(0.1, 2.0, value=0.7, step=0.05, label="freq_scaling_factor")
-                        fcd_wf = gr.Slider(0.0, 1.0, value=0.5, step=0.05, label="w_f")
-                        fcd_noun = gr.Slider(0.0, 1.0, value=0.7, step=0.05, label="noun_weight")
+                # ── Panel: Dataset preview ──
+                with gr.Group(elem_classes="panel-dataset panel-hidden"):
+                    ds_info_header = gr.HTML("")
+                    ds_preview_md = gr.Markdown("", elem_classes="preview-table")
+                    gr.HTML(
+                        '<div class="info-banner" style="margin-top:16px">'
+                        '💡 点击左侧"+ 新建任务"创建处理任务'
+                        '</div>'
+                    )
 
-                with gr.Accordion(
-                    "🧠 CDF-GC 生成复杂度 — 中文，需 GPU",
-                    open=False, elem_classes="step-accordion",
-                ):
-                    enable_gc = gr.Checkbox(label="启用", value=False)
-                    with gr.Row():
-                        gc_lang = gr.Dropdown(["zh"], value="zh", label="语言")
-                        gc_rate = gr.Slider(0.01, 1.0, value=0.2, step=0.01, label="采样率")
-                    with gr.Row():
-                        gc_tok = gr.Textbox(label="Tokenizer 路径", placeholder="/path/to/tokenizer.json")
-                        gc_ltp = gr.Textbox(label="LTP 模型路径", placeholder="/path/to/LTP/small")
-                    with gr.Row():
-                        gc_cuda = gr.Textbox(label="CUDA_VISIBLE_DEVICES", value="0")
-                        gc_wpg = gr.Number(label="Workers / GPU", value=4, precision=0)
+                # ── Panel: Task config/run ──
+                with gr.Group(elem_classes="panel-task panel-hidden"):
 
-                with gr.Accordion(
-                    "🎲 采样 — 需先启用 FCD",
-                    open=False, elem_classes="step-accordion",
-                ):
-                    enable_sample = gr.Checkbox(label="启用", value=False)
+                    task_header = gr.HTML("")
+                    preview_md = gr.Markdown("", elem_classes="preview-table")
+
+                    gr.HTML('<div class="section-heading">流水线配置</div>')
+
+                    with gr.Accordion(
+                        "🧹 数据清洗 — 语言过滤 · 质量过滤 · 去重",
+                        open=False, elem_classes="step-accordion",
+                    ):
+                        enable_clean = gr.Checkbox(label="启用", value=False)
+                        clean_languages = gr.CheckboxGroup(
+                            choices=["zh", "en"],
+                            value=["zh"],
+                            label="目标语言（可多选）",
+                        )
+
+                    with gr.Accordion(
+                        "📊 FCD 词汇难度打分 — 英文，纯 CPU",
+                        open=False, elem_classes="step-accordion",
+                    ):
+                        enable_fcd = gr.Checkbox(label="启用", value=False)
+                        with gr.Row():
+                            fcd_freq = gr.Slider(0.1, 2.0, value=0.7, step=0.05, label="freq_scaling_factor")
+                            fcd_wf = gr.Slider(0.0, 1.0, value=0.5, step=0.05, label="w_f")
+                            fcd_noun = gr.Slider(0.0, 1.0, value=0.7, step=0.05, label="noun_weight")
+
+                    with gr.Accordion(
+                        "🧠 CDF-GC 生成复杂度 — 中文，需 GPU",
+                        open=False, elem_classes="step-accordion",
+                    ):
+                        enable_gc = gr.Checkbox(label="启用", value=False)
+                        with gr.Row():
+                            gc_lang = gr.Dropdown(["zh"], value="zh", label="语言")
+                            gc_rate = gr.Slider(0.01, 1.0, value=0.2, step=0.01, label="采样率")
+                        with gr.Row():
+                            gc_tok = gr.Textbox(label="Tokenizer 路径", placeholder="/path/to/tokenizer.json")
+                            gc_ltp = gr.Textbox(label="LTP 模型路径", placeholder="/path/to/LTP/small")
+                        with gr.Row():
+                            gc_cuda = gr.Textbox(label="CUDA_VISIBLE_DEVICES", value="0")
+                            gc_wpg = gr.Number(label="Workers / GPU", value=4, precision=0)
+
+                    with gr.Accordion(
+                        "🎲 采样 — 需先启用 FCD",
+                        open=False, elem_classes="step-accordion",
+                    ):
+                        enable_sample = gr.Checkbox(label="启用", value=False)
+                        with gr.Row():
+                            samp_method = gr.Dropdown(["cdf", "hard", "random"], value="cdf", label="策略")
+                            samp_rate = gr.Slider(0.01, 1.0, value=0.2, step=0.01, label="采样率")
+                        with gr.Row():
+                            samp_unit = gr.Dropdown(["doc", "token"], value="doc", label="单位")
+                            samp_src = gr.Dropdown(["fcd"], value="fcd", label="分数来源")
+
                     with gr.Row():
-                        samp_method = gr.Dropdown(["cdf", "hard", "random"], value="cdf", label="策略")
-                        samp_rate = gr.Slider(0.01, 1.0, value=0.2, step=0.01, label="采样率")
+                        max_workers = gr.Slider(1, 64, value=8, step=1, label="Workers", scale=3)
+                        start_btn = gr.Button("▶ 开始处理", variant="primary", size="lg", scale=2)
+                        resume_btn = gr.Button("↻ 续传", variant="secondary", size="lg", scale=1)
+
+                    run_info = gr.HTML("")
+
+                    gr.HTML('<div class="section-heading">执行状态</div>')
+                    poll_btn = gr.Button("刷新状态", size="sm")
+                    status_html = gr.HTML(
+                        '<div style="color:#94a3b8;font-size:0.85em">等待任务启动...</div>'
+                    )
+                    log_box = gr.Textbox(
+                        label="运行日志", lines=10, max_lines=20,
+                        interactive=False, elem_classes="log-area",
+                    )
+
+                    gr.HTML('<div class="section-heading">结果与分析</div>')
                     with gr.Row():
-                        samp_unit = gr.Dropdown(["doc", "token"], value="doc", label="单位")
-                        samp_src = gr.Dropdown(["fcd"], value="fcd", label="分数来源")
+                        plot_type = gr.Dropdown(["fcd", "gc"], value="fcd", label="分数类型", scale=2)
+                        plot_btn = gr.Button("绘制分布", size="sm", scale=1)
+                        download_btn = gr.Button("📦 下载结果", size="sm", scale=1)
+                        save_dataset_btn = gr.Button("💾 保存为数据集", size="sm", scale=1)
+                    score_plot = gr.Plot(elem_classes="plot-area")
+                    download_file = gr.File(label="结果压缩包", interactive=False)
 
-                with gr.Row():
-                    max_workers = gr.Slider(1, 64, value=8, step=1, label="Workers", scale=3)
-                    start_btn = gr.Button("▶ 开始处理", variant="primary", size="lg", scale=2)
-                    resume_btn = gr.Button("↻ 续传", variant="secondary", size="lg", scale=1)
-
-                run_info = gr.HTML("")
-
-                gr.HTML('<div class="section-heading">执行状态</div>')
-                poll_btn = gr.Button("刷新状态", size="sm")
-                status_html = gr.HTML(
-                    '<div style="color:#94a3b8;font-size:0.85em">等待任务启动...</div>'
-                )
-                log_box = gr.Textbox(
-                    label="运行日志", lines=10, max_lines=20,
-                    interactive=False, elem_classes="log-area",
-                )
-
-                gr.HTML('<div class="section-heading">结果与分析</div>')
-                with gr.Row():
-                    plot_type = gr.Dropdown(["fcd", "gc"], value="fcd", label="分数类型", scale=2)
-                    plot_btn = gr.Button("绘制分布", size="sm", scale=1)
-                    download_btn = gr.Button("📦 下载结果", size="sm", scale=1)
-                    save_dataset_btn = gr.Button("💾 保存为数据集", size="sm", scale=1)
-                score_plot = gr.Plot(elem_classes="plot-area")
-                download_file = gr.File(label="结果压缩包", interactive=False)
-
-                with gr.Group(visible=False) as save_dialog:
-                    save_name_input = gr.Textbox(label="保存为数据集名称", lines=1)
-                    with gr.Row():
-                        confirm_save_btn = gr.Button("确认保存", variant="primary", size="sm")
-                        cancel_save_btn = gr.Button("取消", size="sm")
+                    with gr.Group(visible=False) as save_dialog:
+                        save_name_input = gr.Textbox(label="保存为数据集名称", lines=1)
+                        with gr.Row():
+                            confirm_save_btn = gr.Button("确认保存", variant="primary", size="sm")
+                            cancel_save_btn = gr.Button("取消", size="sm")
 
         # ═══════════════════════════════
         #  LOGIN HANDLER
@@ -384,16 +410,11 @@ def build_app():
         #  Pattern: JS sets hidden Textbox value → .input() fires → Python handler runs.
         # ═══════════════════════════════
 
-        # ── Dataset select: bridge textbox → update state ──
+        # ── Dataset select: bridge textbox → update state + preview ──
         ds_bridge_box.input(
-            fn=lambda name: name,
+            fn=handle_dataset_preview,
             inputs=[ds_bridge_box],
-            outputs=[current_dataset],
-        )
-        ds_bridge_box.change(
-            fn=lambda name: name,
-            inputs=[ds_bridge_box],
-            outputs=[current_dataset],
+            outputs=[current_dataset, ds_info_header, ds_preview_md],
         )
 
         # ── Dataset rename: bridge textbox → rename handler ──
@@ -419,7 +440,6 @@ def build_app():
         add_ds_btn.click(
             fn=handle_show_add_dialog,
             outputs=[add_dialog, add_name_input, upload_files, upload_info, dir_input],
-            js="() => { document.querySelectorAll('.add-dialog').forEach(el => el.classList.remove('add-dialog-hidden')); }",
         )
         upload_btn.upload(
             fn=handle_file_upload,
@@ -430,11 +450,10 @@ def build_app():
             fn=handle_confirm_add,
             inputs=[upload_files, dir_input, add_name_input],
             outputs=[add_dialog, dataset_list, current_dataset, upload_files, upload_info, dir_input, add_name_input],
-            js="() => { setTimeout(() => document.querySelectorAll('.add-dialog').forEach(el => el.classList.add('add-dialog-hidden')), 500); }",
         )
         cancel_add_btn.click(
-            fn=None,
-            js="() => { document.querySelectorAll('.add-dialog').forEach(el => el.classList.add('add-dialog-hidden')); }",
+            fn=handle_cancel_add,
+            outputs=[add_dialog, upload_files, upload_info, dir_input, add_name_input],
         )
 
         # ── Create task ──
@@ -445,7 +464,7 @@ def build_app():
                 current_dataset, current_task_id, task_list,
                 task_header, status_html, log_box, preview_md, score_plot,
             ],
-            js="(ds, tid) => [window.__selectedDataset || document.querySelector('.dataset-card.selected')?.dataset?.name || ds || '', tid]",
+            js="(ds, tid) => { if(window.switchPanel) window.switchPanel('task'); return [window.__selectedDataset || document.querySelector('.dataset-card.selected')?.dataset?.name || ds || '', tid]; }",
         )
 
         confirm_switch_btn.click(

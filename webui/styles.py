@@ -325,27 +325,21 @@ footer { display: none !important; }
     line-height: 1.5;
 }
 
-/* ── Add dataset dialog ── */
+/* ── Add dataset dialog — fixed centered modal ── */
 .add-dialog {
-    background: #f0f4ff !important;
-    border: 1px solid #c7d2fe !important;
-    border-radius: 8px !important;
-    padding: 12px !important;
-    margin: 8px 0 !important;
-    position: relative;
-    z-index: 10;
-}
-.add-dialog-hidden {
-    display: none !important;
-}
-/* ── Screen-reader only (visually hidden but clickable by JS) ── */
-.sr-only {
     position: fixed !important;
-    top: -9999px !important;
-    left: -9999px !important;
-    opacity: 0 !important;
-    width: 1px !important;
-    height: 1px !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    z-index: 1000 !important;
+    background: #fff !important;
+    border: 1px solid #c7d2fe !important;
+    border-radius: 12px !important;
+    padding: 24px !important;
+    width: 420px !important;
+    max-width: 90vw !important;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,0.3), 0 20px 60px rgba(0,0,0,0.2) !important;
+    margin: 0 !important;
 }
 
 .add-dialog-divider {
@@ -401,5 +395,19 @@ footer { display: none !important; }
     padding: 0 !important;
     border: none !important;
     background: transparent !important;
+}
+
+/* ── Panel switching (idle / dataset / task) ── */
+.panel-hidden {
+    display: none !important;
+}
+.idle-message {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 60vh;
+    color: #94a3b8;
+    text-align: center;
 }
 """

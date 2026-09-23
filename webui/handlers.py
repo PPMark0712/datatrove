@@ -165,6 +165,22 @@ def handle_dataset_select(dataset_name):
     return dataset_name
 
 
+def handle_dataset_preview(ds_name):
+    if not ds_name:
+        return "", "", ""
+    datasets = list_workspace_datasets()
+    ds = next((d for d in datasets if d["name"] == ds_name), None)
+    if not ds:
+        return ds_name, "", ""
+    header = (
+        f'<div class="task-info-card">'
+        f'📂 <b>{escape(ds_name)}</b> &nbsp;·&nbsp; {ds["n_files"]} files'
+        f'</div>'
+    )
+    preview = _preview_md(ds["path"])
+    return ds_name, header, preview
+
+
 def handle_dataset_rename(rename_str, current_dataset):
     if not rename_str or "|||" not in rename_str:
         return gr.update(), current_dataset
@@ -178,23 +194,31 @@ def handle_dataset_rename(rename_str, current_dataset):
 
 
 def handle_show_add_dialog(_trigger=None):
-    return gr.update(), _next_dataset_name(), None, "", ""
+    return gr.Group(visible=True), _next_dataset_name(), None, "", ""
 
 
 def handle_file_upload(files):
     if not files:
         return None, ""
+    valid_files = []
     names = []
     for f in files:
         fname = f.name if hasattr(f, "name") else str(f)
-        names.append(os.path.basename(fname))
+        basename = os.path.basename(fname)
+        if basename.lower().endswith(('.jsonl', '.zip')):
+            valid_files.append(f)
+            names.append(basename)
+        else:
+            gr.Warning(f"不支持的文件格式: {basename}，仅支持 .jsonl 和 .zip")
+    if not valid_files:
+        return None, '<div style="color:#dc2626;font-size:0.82em">未找到有效文件</div>'
     tags = " ".join(
         f'<span style="background:#eef2ff;padding:2px 8px;border-radius:4px;'
         f'margin:2px;display:inline-block;font-size:0.82em;color:#475569">'
         f"📄 {escape(n)}</span>"
         for n in names
     )
-    return files, f"<div>{tags}</div>"
+    return valid_files, f"<div>{tags}</div>"
 
 
 def handle_confirm_add(files, dir_path, name):
@@ -210,11 +234,11 @@ def handle_confirm_add(files, dir_path, name):
         return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
     if not glob_module.glob(os.path.join(staging, "*.jsonl")):
         cancel_upload(staging)
-        gr.Warning("未找到有效的 .jsonl 文件")
+        gr.Warning("未找到有效的 .jsonl 文件，请确保上传 .jsonl 或包含 .jsonl 文件的 .zip")
         return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
     final_name = confirm_upload(staging, name.strip())
     return (
-        gr.update(),
+        gr.Group(visible=False),
         render_dataset_cards(selected=final_name),
         final_name,
         None,
@@ -225,7 +249,7 @@ def handle_confirm_add(files, dir_path, name):
 
 
 def handle_cancel_add():
-    return gr.update(), None, "", "", ""
+    return gr.Group(visible=False), None, "", "", ""
 
 
 # ═══════════════════════════════════════════
