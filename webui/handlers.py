@@ -222,21 +222,23 @@ def handle_file_upload(files):
 
 
 def handle_confirm_add(files, dir_path, name):
+    no_change = (gr.update(),) * 9
     if not name or not name.strip():
         gr.Warning("请输入数据集名称")
-        return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+        return no_change
     if files:
         staging = stage_upload(files=files)
     elif dir_path and dir_path.strip():
         staging = stage_upload(dir_path=dir_path.strip())
     else:
         gr.Warning("请上传文件或输入服务器路径")
-        return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+        return no_change
     if not glob_module.glob(os.path.join(staging, "*.jsonl")):
         cancel_upload(staging)
         gr.Warning("未找到有效的 .jsonl 文件，请确保上传 .jsonl 或包含 .jsonl 文件的 .zip")
-        return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+        return no_change
     final_name = confirm_upload(staging, name.strip())
+    _, header, preview = handle_dataset_preview(final_name)
     return (
         gr.Group(visible=False),
         render_dataset_cards(selected=final_name),
@@ -245,6 +247,8 @@ def handle_confirm_add(files, dir_path, name):
         "",
         "",
         "",
+        header,
+        preview,
     )
 
 

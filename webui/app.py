@@ -455,7 +455,8 @@ def build_app():
         confirm_add_btn.click(
             fn=handle_confirm_add,
             inputs=[upload_files, dir_input, add_name_input],
-            outputs=[add_dialog, dataset_list, current_dataset, upload_files, upload_info, dir_input, add_name_input],
+            outputs=[add_dialog, dataset_list, current_dataset, upload_files, upload_info, dir_input, add_name_input, ds_info_header, ds_preview_md],
+            js="() => { if(window.switchPanel) window.switchPanel('dataset'); }",
         )
         cancel_add_btn.click(
             fn=handle_cancel_add,
@@ -470,7 +471,7 @@ def build_app():
                 current_dataset, current_task_id, task_list,
                 task_header, status_html, log_box, preview_md, score_plot,
             ],
-            js="(ds, tid) => { if(window.switchPanel) window.switchPanel('task'); return [window.__selectedDataset || document.querySelector('.dataset-card.selected')?.dataset?.name || ds || '', tid]; }",
+            js="(ds, tid) => { var name = window.__selectedDataset || document.querySelector('.dataset-card.selected')?.dataset?.name || ds || ''; if(name && window.switchPanel) window.switchPanel('task'); return [name, tid]; }",
         )
 
         confirm_switch_btn.click(
@@ -498,6 +499,7 @@ def build_app():
                 current_task_id, task_list,
                 task_header, status_html, log_box, preview_md, score_plot,
             ],
+            js="(del_str, tid) => { var did = (del_str||'').split('|||')[0].trim(); if(did === tid && window.switchPanel) window.switchPanel('idle'); return [del_str, tid]; }",
         )
         task_rename_bridge.input(
             fn=handle_task_rename,
