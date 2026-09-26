@@ -184,10 +184,14 @@ def main():
             ],
             tasks=args.tasks,
             workers=args.workers,
-            logging_dir=os.path.join(LOG_PATH, "2_quality_filter"),
+            logging_dir=os.path.join(LOG_PATH, "2_quality_filter", language),
             skip_completed=not args.rerun
         )
         quality_filter_executor.run()
+
+        if not os.path.isdir(QUALITY_FILTERING_OUTPUT_PATH) or not os.listdir(QUALITY_FILTERING_OUTPUT_PATH):
+            print(f"[SKIP] No documents survived quality filtering for language '{language}', skipping minhash dedup.")
+            continue
     
         """
         ==============================

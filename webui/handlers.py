@@ -260,8 +260,9 @@ def handle_cancel_add():
 # Task handlers
 # ═══════════════════════════════════════════
 
-def handle_create_task(current_dataset, current_task_id):
-    if not current_dataset:
+def handle_create_task(current_dataset, current_task_id, ds_bridge_value=""):
+    dataset = current_dataset or ds_bridge_value
+    if not dataset:
         gr.Warning("请先在左侧选择数据集")
         return (
             current_dataset,
@@ -273,15 +274,15 @@ def handle_create_task(current_dataset, current_task_id):
     if running:
         gr.Warning(f"{_display_name(running)} 正在运行，请等待完成或终止后再新建")
         return (
-            current_dataset,
+            dataset,
             current_task_id,
             render_task_cards(selected=current_task_id),
             gr.update(), gr.update(), gr.update(), gr.update(), gr.update(),
         )
-    task = create_task_from_workspace(current_dataset)
+    task = create_task_from_workspace(dataset)
     tid = task.task_id
     return (
-        current_dataset,
+        dataset,
         tid,
         render_task_cards(selected=tid),
         _task_header_html(task),

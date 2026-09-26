@@ -193,13 +193,7 @@ def build_app():
     auth_dict = parse_auth(AUTH_USERS)
     need_auth = bool(auth_dict)
 
-    with gr.Blocks(title="Datatrove 数据筛选平台", css=CUSTOM_CSS, theme=gr.themes.Soft(
-        primary_hue="indigo",
-        secondary_hue="slate",
-        neutral_hue="slate",
-        font=gr.themes.GoogleFont("Inter"),
-        radius_size=gr.themes.sizes.radius_md,
-    )) as app:
+    with gr.Blocks(title="Datatrove 数据筛选平台") as app:
 
         current_dataset = gr.State("")
         current_task_id = gr.State("")
@@ -456,7 +450,7 @@ def build_app():
             fn=handle_confirm_add,
             inputs=[upload_files, dir_input, add_name_input],
             outputs=[add_dialog, dataset_list, current_dataset, upload_files, upload_info, dir_input, add_name_input, ds_info_header, ds_preview_md],
-            js="() => { if(window.switchPanel) window.switchPanel('dataset'); }",
+            js="(files, dir_path, name) => { if(window.switchPanel) window.switchPanel('dataset'); return [files, dir_path, name]; }",
         )
         cancel_add_btn.click(
             fn=handle_cancel_add,
@@ -466,12 +460,12 @@ def build_app():
         # ── Create task ──
         add_task_btn.click(
             fn=handle_create_task,
-            inputs=[current_dataset, current_task_id],
+            inputs=[current_dataset, current_task_id, ds_bridge_box],
             outputs=[
                 current_dataset, current_task_id, task_list,
                 task_header, status_html, log_box, preview_md, score_plot,
             ],
-            js="(ds, tid) => { var name = window.__selectedDataset || document.querySelector('.dataset-card.selected')?.dataset?.name || ds || ''; if(name && window.switchPanel) window.switchPanel('task'); return [name, tid]; }",
+            js="(ds, tid, bridge) => { if((ds || bridge) && window.switchPanel) window.switchPanel('task'); return [ds, tid, bridge]; }",
         )
 
         confirm_switch_btn.click(
@@ -558,7 +552,7 @@ def build_app():
         )
 
         # ── Global JS setup: document-level event delegation ──
-        app.load(fn=None, js=GLOBAL_JS)
+        app.load(fn=lambda: None, js=GLOBAL_JS)
 
     return app
 
@@ -570,4 +564,12 @@ if __name__ == "__main__":
         server_name="0.0.0.0",
         server_port=port,
         share=False,
+        css=CUSTOM_CSS,
+        theme=gr.themes.Soft(
+            primary_hue="indigo",
+            secondary_hue="slate",
+            neutral_hue="slate",
+            font=gr.themes.GoogleFont("Inter"),
+            radius_size=gr.themes.sizes.radius_md,
+        ),
     )
