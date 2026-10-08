@@ -8,9 +8,10 @@ from pathlib import Path
 import gradio as gr
 
 from styles import CUSTOM_CSS
+from preview import Preview, SCROLL_JS
 from handlers import (
     config_values, dataset_choices, task_choices, next_dataset_name,
-    preview, row_count, status_html, result_view, make_config, plot_scores,
+    status_html, result_view, make_config, plot_scores,
     config_controls, config_hint,
 )
 from task_manager import (
@@ -59,12 +60,7 @@ def build_app():
                     with gr.Row(elem_classes="name-actions"):
                         dataset_new_name = gr.Textbox(label="数据集名称", scale=5, max_lines=1)
                         rename_ds = gr.Button("重命名", scale=1)
-                    gr.Markdown("预览前 20 条记录。点击任意一行可查看完整正文与元数据。")
-                    dataset_table = gr.Dataframe(headers=["ID", "正文", "元数据"], datatype=["str"] * 3,
-                                                 interactive=False, wrap=True, max_height=320, max_chars=96,
-                                                 column_widths=["100px", "65%", "150px"], elem_classes="preview-table")
-                    dataset_detail = gr.Textbox(label="记录详情", lines=6, max_lines=12,
-                                                interactive=False, visible=False, buttons=["copy"], elem_id="dataset-detail")
+                    dataset_preview = Preview("dataset")
                     gr.Markdown("点击左侧 **新建任务**，使用此数据集的副本进行处理。")
                 with gr.Column(visible=False) as task_panel:
                     task_status = gr.HTML()
@@ -125,12 +121,7 @@ def build_app():
                             result_stats = gr.Dataframe(headers=["阶段", "记录数"], datatype=["str", "number"],
                                                        interactive=False, label="处理统计", visible=False,
                                                        elem_classes="stats-table")
-                            result_table = gr.Dataframe(headers=["ID", "正文", "元数据"], datatype=["str"] * 3,
-                                                       interactive=False, wrap=True, max_height=320, max_chars=96,
-                                                       column_widths=["100px", "65%", "150px"], elem_classes="preview-table",
-                                                       visible=False)
-                            result_detail = gr.Textbox(label="结果详情", lines=6, max_lines=12,
-                                                      interactive=False, visible=False, buttons=["copy"], elem_id="result-detail")
+                            result_preview = Preview("result", visible=False)
                             with gr.Accordion("分数分布", open=False, visible=False) as score_section:
                                 score_type = gr.Dropdown(
                                     [("FCD", "fcd"), ("GC · 词性熵", "gc:pos_ent"),
@@ -170,11 +161,13 @@ def build_app():
         selection = [current_dataset, current_task, current_mode]
         view_outputs = [
             datasets, tasks, create_task, idle_panel, dataset_panel, task_panel,
-            dataset_header, dataset_table, dataset_new_name, dataset_detail,
-            task_status, task_new_name, task_input_info, logs, result_summary, result_stats, result_table,
-            result_detail, download_file, score_plot, delete_dialog, save_dialog, task_tabs,
+            dataset_header, dataset_new_name,
+            task_status, task_new_name, task_input_info, logs, result_summary, result_stats,
+            download_file, score_plot, delete_dialog, save_dialog, task_tabs,
             start, resume, stop, download, save, last_status, config_feedback, score_section, delete_job, score_type,
         ] + config_inputs
+        view_outputs += [dataset_preview.section] + dataset_preview.outputs
+        view_outputs += [result_preview.section] + result_preview.outputs
 
         def render(ds, tid, mode, task_drafts):
             task = Task(tid) if tid else None
@@ -183,12 +176,10 @@ def build_app():
             done = state.get("status") == "completed"
             dataset_path = Path(WORKSPACE_DIR) / ds if ds else None
             header = ""
-            rows = []
             if ds and mode == "dataset" and dataset_path.is_dir():
-                rows = preview(dataset_path)
-                count = row_count(dataset_path.glob("*.jsonl"))
-                header = f'<h2>{escape(ds)}</h2><p class="muted">{count:,} 条记录 · JSONL 数据集</p>'
-            summary, stats, output = result_view(task) if task else ("", [], [])
+                count = len(list(dataset_path.glob("*.jsonl")))
+                header = f'<h2>{escape(ds)}</h2><p class="muted">{count} 个文件 · JSONL 数据集</p>'
+            summary, stats, output = result_view(task) if task else ("", [], 0)
             values = task_drafts.get(tid, config_values(task))
             controls = config_controls(values, busy)
             scored = done and bool(set(task.load_config().get("steps", [])) & {"fcd", "cdf_gc"})
@@ -197,12 +188,11 @@ def build_app():
                 gr.update(choices=task_choices(), value=tid or None),
                 gr.update(interactive=bool(ds)),
                 gr.update(visible=mode == "idle"), gr.update(visible=mode == "dataset"),
-                gr.update(visible=mode == "task"), header, rows, ds, gr.update(value="", visible=False),
+                gr.update(visible=mode == "task"), header, ds,
                 status_html(task) if task else "", task.get_display_name() if task else "",
                 f"输入副本：**{task.count_input_rows():,} 条** · {task.count_input_files()} 个文件" if task else "",
                 task.get_log() if task else "", summary,
-                gr.update(value=stats, visible=done), gr.update(value=output, visible=bool(output)),
-                gr.update(value="", visible=False),
+                gr.update(value=stats, visible=done),
                 gr.update(value=None, visible=False), None, gr.update(visible=False), gr.update(visible=False),
                 gr.skip(),
                 gr.update(value="开始处理" if state.get("status") == "created" else "重新运行",
@@ -211,7 +201,7 @@ def build_app():
                 gr.update(interactive=state.get("status") == "running"),
                 gr.update(interactive=done), gr.update(interactive=done and bool(output)), state,
                 config_hint(values), gr.update(visible=scored), gr.update(interactive=not busy), score_options(task),
-            ] + [dict(control, value=value) for value, control in zip(values, controls)]
+            ] + [dict(control, value=value) for value, control in zip(values, controls)] + dataset_preview.reset() + result_preview.reset(bool(output))
 
         def show_view(event):
             event = event.success(render, selection + [drafts], view_outputs,
@@ -340,23 +330,23 @@ def build_app():
             if state == previous and not busy and not force:
                 return unchanged[:2] + (choices,) + unchanged[3:]
             done = state.get("status") == "completed"
-            summary, stats, rows = result_view(task)
+            summary, stats, output = result_view(task)
             values = task_drafts.get(tid, config_values(task))
             scored = done and bool(set(task.load_config().get("steps", [])) & {"fcd", "cdf_gc"})
             return (
                 status_html(task), task.get_log(), choices,
-                summary, gr.update(value=stats, visible=done), gr.update(value=rows, visible=bool(rows)),
+                summary, gr.update(value=stats, visible=done), gr.update(visible=bool(output)),
                 gr.update(value="开始处理" if state.get("status") == "created" else "重新运行",
                           interactive=not busy),
                 gr.update(interactive=state.get("status") in ("error", "stopped")),
                 gr.update(interactive=state.get("status") == "running"),
-                gr.update(interactive=done), gr.update(interactive=done and bool(rows)), state,
+                gr.update(interactive=done), gr.update(interactive=done and bool(output)), state,
                 gr.update(selected="results") if done and previous and previous.get("status") in ("running", "stopping") else gr.skip(),
                 gr.update(choices=dataset_choices()), config_hint(values), gr.update(visible=scored),
                 gr.update(interactive=not busy), score_options(task) if state != previous else gr.skip(),
             ) + tuple(config_controls(values, busy))
 
-        poll_outputs = [task_status, logs, tasks, result_summary, result_stats, result_table,
+        poll_outputs = [task_status, logs, tasks, result_summary, result_stats, result_preview.section,
                         start, resume, stop, download, save, last_status, task_tabs, datasets,
                         config_feedback, score_section, delete_job, score_type] + config_inputs
         timer.tick(poll, [current_task, last_status, drafts], poll_outputs,
@@ -365,17 +355,12 @@ def build_app():
                            [current_task, last_status, drafts], poll_outputs,
                            show_progress="hidden", concurrency_id="view-state")
 
-        def row_detail(data, event: gr.SelectData):
-            index = event.index[0]
-            if not 0 <= index < len(data):
-                return gr.update(value="", visible=False)
-            record = data.iloc[index]
-            return gr.update(value=f"ID: {record.iloc[0]}\n\n{record.iloc[1]}\n\n元数据：{record.iloc[2]}", visible=True)
-
-        dataset_table.select(row_detail, dataset_table, dataset_detail, show_progress="hidden").success(
-            fn=None, js="() => requestAnimationFrame(() => document.getElementById('dataset-detail')?.scrollIntoView({block: 'nearest'}))")
-        result_table.select(row_detail, result_table, result_detail, show_progress="hidden").success(
-            fn=None, js="() => requestAnimationFrame(() => document.getElementById('result-detail')?.scrollIntoView({block: 'nearest'}))")
+        dataset_preview.bind(
+            lambda ds, tid, mode: Path(WORKSPACE_DIR) / ds if ds and mode == "dataset" else None, selection)
+        result_preview.bind(
+            lambda ds, tid, mode: Task(tid).output_dir
+            if tid and mode == "task" and Task(tid).get_status().get("status") == "completed" else None, selection)
+        app.load(fn=None, js=SCROLL_JS)
 
         def download_result(tid):
             task = Task(tid)

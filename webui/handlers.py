@@ -1,6 +1,5 @@
 """Presentation helpers shared by the dataset and task views."""
 
-import json
 from html import escape
 from pathlib import Path
 
@@ -36,25 +35,6 @@ def next_dataset_name():
     return f"数据集{number}"
 
 
-def preview(folder, limit=20):
-    """Return a bounded preview, preserving full text for the detail viewer."""
-    records = []
-    for path in sorted(Path(folder).glob("*.jsonl")):
-        with path.open(encoding="utf-8") as source:
-            for line in source:
-                if not line.strip():
-                    continue
-                item = json.loads(line)
-                records.append([
-                    str(item.get("id", len(records) + 1)),
-                    str(item.get("text", "")),
-                    json.dumps(item.get("metadata", {}), ensure_ascii=False),
-                ])
-                if len(records) == limit:
-                    return records
-    return records
-
-
 def row_count(paths):
     total = 0
     for path in paths:
@@ -86,7 +66,7 @@ def result_view(task):
             "stopped": "任务已停止，尚无完整结果。可继续运行，或修改配置后重新运行。",
             "error": "任务未完成，请查看「运行日志」中的错误原因，修正后继续或重新运行。",
         }
-        return messages.get(state, "任务完成后，将在这里展示输出、过滤统计和下载入口。"), [], []
+        return messages.get(state, "任务完成后，将在这里展示输出、过滤统计和下载入口。"), [], 0
     total = task.count_input_rows()
     output = row_count(Path(task.output_dir).glob("*.jsonl"))
     config = task.load_config()
@@ -105,7 +85,7 @@ def result_view(task):
         summary += f" · 保留率 {output / total:.1%}"
     if not output:
         summary += "\n\n所有记录均被过滤或未被采样选中；任务已正常结束。"
-    return summary, stats, preview(task.output_dir)
+    return summary, stats, output
 
 
 def config_values(task=None):
