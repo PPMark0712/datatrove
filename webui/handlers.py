@@ -78,6 +78,8 @@ def result_view(task):
             ["质量过滤后", row_count((clean / "2_quality_filter").glob("*/output/*.jsonl"))],
             ["去重后", row_count((clean / "3_minhash_deduplication").glob("*/4_result/output/*.jsonl"))],
         ])
+    if "fcd" in config.get("steps", []):
+        stats.append(["FCD 打分后（采样前）", row_count((Path(task.work_dir) / "fcd" / "annotated").glob("*.jsonl"))])
     stats.append(["最终输出", output])
     removed = max(total - output, 0)
     summary = f"**输入 {total:,} 条 → 输出 {output:,} 条** · 减少 {removed:,} 条"
@@ -85,6 +87,9 @@ def result_view(task):
         summary += f" · 保留率 {output / total:.1%}"
     if not output:
         summary += "\n\n所有记录均被过滤或未被采样选中；任务已正常结束。"
+    if config.get("sample"):
+        sample = config["sample"]
+        summary += f'\n\n采样：**{sample["method"]}** · 保留比例 **{sample["sample_rate"]:.0%}**（相对于采样前数据）'
     return summary, stats, output
 
 

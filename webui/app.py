@@ -97,9 +97,11 @@ def build_app():
                             with gr.Accordion("采样 · 基于 FCD 打分", open=False):
                                 sample = gr.Checkbox(label="启用采样")
                                 with gr.Row():
-                                    method = gr.Dropdown(["cdf", "hard", "random"], value="cdf", label="采样策略")
+                                    method = gr.Radio([("CDF", "cdf"), ("Hard", "hard"), ("Random", "random")],
+                                                      value="cdf", label="采样策略")
                                     sample_rate = gr.Slider(0.01, 1, value=0.2, step=0.01, label="采样率")
                                     unit = gr.Dropdown(["doc"], value="doc", label="采样单位（文档）")
+                                gr.Markdown("hard：在每个输入分片内，按 FCD 从高到低保留指定比例，文档数向下取整。")
                             workers = gr.Slider(1, 32, value=4, step=1, label="最大工作进程数")
                             config_feedback = gr.Markdown(config_hint(config_values()), elem_classes="config-feedback")
                             gr.Markdown("重新运行会替换旧结果；继续运行沿用上次配置和已完成阶段。")
@@ -128,6 +130,7 @@ def build_app():
                                      ("GC · 成分熵", "gc:con_ent"), ("GC · 依存熵", "gc:dep_ent"),
                                      ("GC · 依存树高度", "gc:avg_dep_height"), ("GC · 依存距离", "gc:avg_dep_dis")],
                                     value="fcd", label="分数类型（GC 展示归一化分量）")
+                                gr.Markdown("FCD 分布统计全部已打分记录（采样前）；最终保留数量见上方处理统计。")
                                 plot = gr.Button("绘制分布")
                                 score_plot = gr.Plot()
                         with gr.Tab("运行日志", id="logs", render_children=True):

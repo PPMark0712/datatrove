@@ -63,8 +63,8 @@ def read_detail(state, index):
     with open(path, "rb") as source:
         source.seek(offset)
         item = json.loads(source.readline())
-    return (f'ID: {item.get("id", index + 1)}\n\n{item.get("text", "")}\n\n'
-            f'元数据：{json.dumps(item.get("metadata", {}), ensure_ascii=False)}')
+    return (f'ID: {item.get("id", index + 1)}\n\n{item.get("text", "")}',
+            json.dumps(item.get("metadata", {}), ensure_ascii=False, indent=4))
 
 
 class Preview:
@@ -81,14 +81,17 @@ class Preview:
             self.status = gr.Markdown("")
             self.more = gr.Button("… 加载下 20 行", size="sm", visible=False,
                                   elem_id=f"{name}-preview-more")
-            self.detail = gr.Textbox(label="记录详情", lines=6, max_lines=12,
-                                     interactive=False, visible=False, buttons=["copy"],
-                                     elem_id=f"{name}-detail")
-        self.outputs = [self.state, self.table, self.status, self.more, self.detail]
+            with gr.Column(visible=False, elem_id=f"{name}-detail") as self.detail_panel:
+                self.detail = gr.Textbox(label="记录正文", lines=6, max_lines=12,
+                                         interactive=False, buttons=["copy"])
+                self.metadata = gr.Code(label="元数据", language="json", lines=3, max_lines=14,
+                                         interactive=False, wrap_lines=True, buttons=["copy"])
+        self.detail_outputs = [self.detail_panel, self.detail, self.metadata]
+        self.outputs = [self.state, self.table, self.status, self.more] + self.detail_outputs
 
     @staticmethod
     def cleared():
-        return [None, [], "", gr.update(visible=False), gr.update(value="", visible=False)]
+        return [None, [], "", gr.update(visible=False), gr.update(visible=False), "", ""]
 
     def reset(self, visible=True):
         return [gr.update(open=False, visible=visible)] + self.cleared()
@@ -110,7 +113,7 @@ class Preview:
             message += " · … 下滑继续加载" if more else " · … 已达 100 行预览上限"
         else:
             message += " · 已显示全部记录"
-        return [state, state["rows"], message, gr.update(visible=more), gr.skip()]
+        return [state, state["rows"], message, gr.update(visible=more)] + [gr.skip()] * 3
 
     def bind(self, source, selection):
         def expand(*values):
@@ -125,13 +128,14 @@ class Preview:
 
         def detail(state, event: gr.SelectData):
             if not state or not 0 <= event.index[0] < len(state["locations"]):
-                return gr.update(value="", visible=False)
+                return gr.update(visible=False), "", ""
             try:
-                return gr.update(value=read_detail(state, event.index[0]), visible=True)
+                text, metadata = read_detail(state, event.index[0])
+                return gr.update(visible=True), text, metadata
             except (OSError, ValueError, UnicodeError) as exc:
                 raise gr.Error(f"记录加载失败：{exc}") from exc
 
-        self.table.select(detail, self.state, self.detail, **options).success(
+        self.table.select(detail, self.state, self.detail_outputs, **options).success(
             fn=None, js=f"() => requestAnimationFrame(() => document.getElementById('{self.name}-detail')?.scrollIntoView({{block: 'nearest'}}))")
 
 
