@@ -15,8 +15,10 @@ footer { display: none !important; }
     display: flex; align-items: center; gap: 16px;
     border-bottom: 1px solid #e2e8f0; background: #fff; color: #0f172a;
 }
-.app-header strong { color: #4338ca; font-size: 20px; letter-spacing: -.5px; }
-.app-header span { color: #475569; font-size: 14px; }
+.app-header strong {
+    min-width: 0; overflow: hidden; color: #4338ca; font-size: 20px;
+    letter-spacing: 0; line-height: 1.25; white-space: nowrap; text-overflow: ellipsis;
+}
 .app-header small { margin-left: auto; color: #64748b; }
 #workspace {
     height: calc(100dvh - 60px); min-height: 0 !important;
@@ -151,7 +153,7 @@ footer { display: none !important; }
 }
 @media (max-width: 560px) {
     .app-header { padding: 0 12px; gap: 8px; }
-    .app-header span { font-size: 11px; }
+    .app-header strong { font-size: 16px; }
     #workspace { height: auto; flex-wrap: wrap !important; }
     #sidebar { flex: 1 1 100% !important; height: 300px; border-right: 0; }
     #main-panel { height: auto; overflow: visible; }

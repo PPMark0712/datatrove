@@ -20,20 +20,22 @@ from task_manager import (
     save_output_as_dataset, delete_task, list_tasks, validate_dataset_name,
 )
 
+APP_TITLE = "领域大模型训练数据筛选与质量评估平台"
+
 
 def parse_auth(value):
     return [tuple(pair.strip().split(":", 1)) for pair in value.split(",") if ":" in pair]
 
 
 def build_app():
-    with gr.Blocks(title="Datatrove · 数据筛选平台") as app:
+    with gr.Blocks(title=APP_TITLE) as app:
         current_dataset = gr.State("")
         current_task = gr.State("")
         current_mode = gr.State("idle")
         last_status = gr.State(None)
         drafts = gr.State({})
-        gr.HTML('<header class="app-header"><strong>Datatrove</strong>'
-                '<span>数据筛选与质量评估平台</span><small>导入 → 配置 → 处理 → 结果</small></header>', elem_id="brand")
+        gr.HTML(f'<header class="app-header"><strong>{APP_TITLE}</strong>'
+                '<small>数据清洗 · 难度评估 · 智能采样</small></header>', elem_id="brand")
         with gr.Row(elem_id="workspace", equal_height=False):
             with gr.Column(scale=0, min_width=270, elem_id="sidebar"):
                 with gr.Column(elem_classes="sidebar-section"):
@@ -452,7 +454,7 @@ if __name__ == "__main__":
         server_name=os.environ.get("WEBUI_HOST", "127.0.0.1"),
         server_port=int(os.environ.get("WEBUI_PORT", "7860")),
         auth=parse_auth(os.environ.get("WEBUI_AUTH", "admin:datatrove2024")) or None,
-        auth_message="Datatrove 数据筛选平台 · 请登录",
+        auth_message=f"{APP_TITLE} · 请登录",
         share=False, css=CUSTOM_CSS,
         theme=gr.themes.Soft(primary_hue="indigo", neutral_hue="slate",
                              font=["system-ui", "sans-serif"]),
