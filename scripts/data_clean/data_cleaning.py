@@ -133,7 +133,10 @@ def main():
     ==============================
     """
 
-    language_folders = os.listdir(LANGUAGE_FILTER_OUTPUT_PATH)
+    if not os.path.isdir(LANGUAGE_FILTER_OUTPUT_PATH):
+        print("[SKIP] No documents survived language filtering.")
+        return
+    language_folders = sorted(os.listdir(LANGUAGE_FILTER_OUTPUT_PATH))
     for language in language_folders:
         QUALITY_FILTERING_REMOVE_PATH = os.path.join(QUALITY_FILTERING_PATH, language, "removed")
         QUALITY_FILTERING_OUTPUT_PATH = os.path.join(QUALITY_FILTERING_PATH, language, "output")
@@ -297,4 +300,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
