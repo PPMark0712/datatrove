@@ -165,4 +165,5 @@ playground/
 # WebUI runtime data
 webui/workspace/
 webui/tasks/
+webui/.cache/
 webui/test_data/

@@ -1,416 +1,160 @@
-"""CSS styles for the Datatrove WebUI."""
+"""Layout styles: native controls remain responsible for interaction."""
 
 CUSTOM_CSS = """
-/* ── Reset & full-height layout ── */
-.gradio-container {
-    max-width: 100% !important;
-    padding: 0 !important;
-    height: 100vh !important;
-    overflow: hidden !important;
-}
-.gradio-container > .main > .wrap {
-    overflow: hidden !important;
-}
+:root { color-scheme: light; }
+body { margin: 0; }
+.gradio-container { max-width: 100% !important; padding: 0 !important; }
+.gradio-container > .main { padding: 0 !important; }
+.gradio-container > .main > .wrap { gap: 0 !important; }
+.gradio-container main > .column { gap: 0 !important; }
+#brand { padding: 0 !important; margin: 0 !important; border: 0 !important; }
+#brand .html-container { padding: 0 !important; }
 footer { display: none !important; }
-
-/* Hidden bridge buttons — rendered in DOM but invisible */
-.hidden-bridge {
-    position: absolute !important;
-    width: 1px !important;
-    height: 1px !important;
-    overflow: hidden !important;
-    clip: rect(0,0,0,0) !important;
-    border: 0 !important;
-    padding: 0 !important;
-    margin: -1px !important;
-    pointer-events: none !important;
-}
-
-/* ── App header — sticky top bar ── */
 .app-header {
-    background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
-    padding: 14px 28px;
-    display: flex;
-    align-items: baseline;
-    gap: 12px;
-    flex-shrink: 0;
+    box-sizing: border-box; height: 60px; padding: 0 24px;
+    display: flex; align-items: center; gap: 16px;
+    border-bottom: 1px solid #e2e8f0; background: #fff; color: #0f172a;
 }
-.app-header h1 {
-    color: #fff;
-    font-size: 1.15em;
-    font-weight: 700;
-    margin: 0;
+.app-header strong { color: #4338ca; font-size: 20px; letter-spacing: -.5px; }
+.app-header span { color: #475569; font-size: 14px; }
+.app-header small { margin-left: auto; color: #64748b; }
+#workspace {
+    height: calc(100dvh - 60px); min-height: 0 !important;
+    flex-wrap: nowrap !important; gap: 0 !important;
 }
-.app-header span {
-    color: rgba(255,255,255,0.65);
-    font-size: 0.82em;
+#sidebar {
+    box-sizing: border-box; height: 100%; min-height: 0 !important;
+    flex: 0 0 280px !important; gap: 0 !important; padding: 0 12px 12px;
+    border-right: 1px solid #e2e8f0; background: #f8fafc;
+    overflow: hidden; display: flex; flex-direction: column;
 }
-
-/* ── Sidebar — fixed height, two equal sections ── */
-.sidebar {
-    background: #f8fafc !important;
-    border-right: 1px solid #e2e8f0 !important;
-    padding: 0 !important;
-    overflow: hidden !important;
-    flex-shrink: 0 !important;
-    height: calc(100vh - 60px) !important;
-    display: flex !important;
-    flex-direction: column !important;
-}
-
-/* Each sidebar section (datasets / tasks) takes half the height */
 .sidebar-section {
-    flex: 0 1 auto !important;
-    max-height: 50% !important;
-    min-height: 80px !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    padding: 4px 12px 8px !important;
-    border-bottom: 1px solid #e2e8f0;
-    gap: 0px !important;
-    display: block !important;
+    flex: 1 1 0 !important; min-height: 0 !important;
+    overflow: hidden; gap: 0 !important; padding-bottom: 10px;
+    display: flex !important; flex-direction: column !important;
 }
-.sidebar-section:last-child {
-    border-bottom: none;
+.sidebar-section + .sidebar-section { border-top: 1px solid #e2e8f0; }
+.section-heading { flex: 0 0 auto !important; }
+.section-heading .html-container { padding: 0 !important; }
+.sidebar-label { font-weight: 600; font-size: 13px; color: #475569; padding: 14px 4px 10px; }
+.sidebar-scroll {
+    display: block !important; min-height: 0 !important;
+    overflow-y: auto !important; overflow-x: hidden !important;
+    flex: 0 1 auto !important; scrollbar-gutter: stable;
 }
-
-/* Section label pinned via sticky */
-.sidebar-label {
-    position: sticky !important;
-    top: 0 !important;
-    background: #f8fafc !important;
-    z-index: 1 !important;
-    padding: 4px 0 !important;
+.item-list { border: 0 !important; padding: 0 !important; background: transparent !important; }
+.item-list .wrap { display: flex !important; flex-direction: column; gap: 6px !important; }
+.item-list label {
+    width: 100%; box-sizing: border-box; margin: 0 !important;
+    padding: 8px 10px !important; border-radius: 6px !important;
+    border: 1px solid #e2e8f0 !important; box-shadow: none !important;
+    font-size: 13px !important; line-height: 1.5 !important;
+    color: #334155; overflow-wrap: anywhere; cursor: pointer;
 }
-
-/* Card list — no flex growth, natural height */
-.card-list-wrap {
-    overflow: visible !important;
+.item-list label:has(input:checked) { background: #eef2ff !important; border-color: #818cf8 !important; }
+.item-list input { flex-shrink: 0; }
+.item-list label:focus-within { outline: 2px solid #6366f1; outline-offset: -2px; }
+.add-button {
+    flex: 0 0 auto !important; margin-top: 8px !important; width: 100%;
+    min-height: 38px !important; border: 1px dashed #94a3b8 !important;
+    background: transparent !important; color: #475569 !important;
 }
-.card-list-wrap .card-list {
-    overflow: visible !important;
+.add-button:disabled { opacity: .5; }
+#main-panel {
+    box-sizing: border-box; height: 100%; min-width: 0 !important;
+    padding: 18px 28px 28px; display: block !important;
+    overflow-y: auto; overflow-x: hidden;
 }
-
-/* Add button and hidden bridges don't grow */
-.sidebar-section > button,
-.sidebar-section > .form,
-.sidebar-section > .gr-group {
-    flex-shrink: 0 !important;
-}
-
-/* ── Main panel — vertical layout with scroll ── */
-.main-panel {
-    padding: 0 32px 24px !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    height: calc(100vh - 60px) !important;
-    flex: 1 1 0% !important;
-    display: block !important;
-}
-.main-panel > * {
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-}
-
-/* ── Sidebar labels ── */
-.sidebar-label {
-    font-size: 0.72em;
-    font-weight: 700;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin: 8px 0 6px 2px;
-    flex-shrink: 0;
-}
-
-/* ── Card list ── */
-.card-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-.card {
-    border: 1px solid #e2e8f0;
-    border-radius: 6px;
-    padding: 8px 12px;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    background: #fff;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 36px;
-    user-select: none;
-}
-.card:hover {
-    border-color: #a5b4fc;
-}
-.card.selected {
-    border-color: #6366f1;
-    background: #eef2ff;
-}
-.card-name {
-    flex: 1;
-    font-size: 0.85em;
-    color: #1e293b;
-    outline: none;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.card-name[contenteditable="true"] {
-    background: #fff;
-    border-radius: 3px;
-    padding: 1px 4px;
-    box-shadow: 0 0 0 2px #6366f1;
-    white-space: pre;
-    user-select: text;
-    cursor: text;
-}
-.card-meta {
-    font-size: 0.72em;
-    color: #94a3b8;
-    flex-shrink: 0;
-}
-.card-icon {
-    flex-shrink: 0;
-    font-size: 0.8em;
-}
-.card-delete {
-    display: none;
-    cursor: pointer;
-    font-size: 0.8em;
-    opacity: 0.35;
-    flex-shrink: 0;
-    transition: opacity 0.15s;
-    padding: 0 2px;
-}
-.card:hover .card-delete {
-    display: inline-block;
-}
-.card-delete:hover {
-    opacity: 1;
-}
-
-/* ── Add card (dashed +) ── */
-.card-add {
-    border: 2px dashed #cbd5e1;
-    background: transparent;
-    justify-content: center;
-    color: #94a3b8;
-    font-size: 1.1em;
-    font-weight: 500;
-}
-.card-add:hover {
-    border-color: #6366f1;
-    color: #6366f1;
-}
-
-/* ── Add card button (native Gradio button styled as dashed card) ── */
-.card-add-btn {
-    border: 2px dashed #cbd5e1 !important;
-    background: transparent !important;
-    color: #94a3b8 !important;
-    font-size: 0.9em !important;
-    font-weight: 500 !important;
-    border-radius: 6px !important;
-    margin-top: 4px !important;
-    box-shadow: none !important;
-}
-.card-add-btn:hover {
-    border-color: #6366f1 !important;
-    color: #6366f1 !important;
-    background: transparent !important;
-}
-
-/* ── Empty state hint ── */
-.empty-hint {
-    text-align: center;
-    color: #94a3b8;
-    font-size: 0.78em;
-    padding: 6px 0;
-}
-
-/* ── Section headings in main panel ── */
-.section-heading {
-    font-size: 0.92em;
-    font-weight: 600;
-    color: #1e293b;
-    padding: 10px 0 8px;
-    border-bottom: 1px solid #e2e8f0;
-    margin: 24px 0 12px;
-}
-
-/* ── Step accordion ── */
-.step-accordion {
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 8px !important;
-    margin-bottom: 6px !important;
-}
-
-/* ── Status badges ── */
-.badge {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 4px;
-    font-size: 0.75em;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-.badge-created  { background: #dbeafe; color: #1e40af; }
-.badge-running  { background: #fef3c7; color: #92400e; }
+#main-panel h2 { margin: 0 0 8px; font-size: 23px; letter-spacing: -.4px; }
+.name-actions { align-items: end !important; }
+.name-actions > button { flex-grow: 0 !important; min-width: 88px !important; margin-bottom: 1px; }
+.config-feedback { border-left: 3px solid #a5b4fc; padding: 6px 12px !important; background: #eef2ff; }
+.config-feedback p { color: #475569; font-size: 13px; margin: 0 !important; }
+.task-tabs > .tab-nav { background: var(--background-fill-primary, #fff); }
+.run-actions { padding: 8px 0; }
+.empty-state { max-width: 620px; margin: 12vh auto 0; }
+.empty-state p { color: #64748b; line-height: 1.8; }
+.eyebrow { color: #6366f1; font-size: 12px; letter-spacing: 2px; margin-bottom: 16px; }
+.muted { color: #64748b; font-size: 13px; line-height: 1.8; }
+.status-line { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.status-line strong { font-size: 20px; overflow-wrap: anywhere; }
+.status-line > span:last-child { font-size: 13px; color: #64748b; }
+.badge { padding: 4px 9px; border-radius: 5px; font-size: 12px; background: #f1f5f9; color: #475569; }
+.badge-running, .badge-stopping { background: #fef3c7; color: #92400e; }
 .badge-completed { background: #d1fae5; color: #065f46; }
-.badge-error    { background: #fee2e2; color: #991b1b; }
-.badge-stopped  { background: #f1f5f9; color: #475569; }
-
-/* ── Task info card ── */
-.task-info-card {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 12px 16px;
-    line-height: 1.6;
+.badge-error { background: #fee2e2; color: #991b1b; }
+.badge-created { background: #e0e7ff; color: #3730a3; }
+.preview-table {
+    max-width: 100%; border: 1px solid #cbd5e1 !important;
+    border-radius: 6px !important; overflow: hidden !important;
 }
-
-/* ── Log area ── */
-.log-area textarea {
-    font-family: 'SF Mono', 'Menlo', 'Consolas', monospace !important;
-    font-size: 0.78em !important;
-    line-height: 1.5 !important;
-    background: #1e293b !important;
-    color: #cbd5e1 !important;
-    border-radius: 6px !important;
-}
-
-/* ── Info banner ── */
-.info-banner {
-    background: #f0f4ff;
-    border-left: 3px solid #6366f1;
-    border-radius: 0 6px 6px 0;
-    padding: 10px 14px;
-    font-size: 0.85em;
-    color: #1e1b4b;
-    line-height: 1.5;
-    margin-bottom: 8px;
-}
-
-/* ── Plot area ── */
-.plot-area {
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    background: #fff;
-}
-
-/* ── Preview table ── */
-.preview-table table {
-    font-size: 0.85em;
-}
+.preview-table table { border-collapse: separate !important; border-spacing: 0 !important; }
+.preview-table thead { position: sticky; top: 0; z-index: 2; }
 .preview-table th {
-    background: #f1f5f9 !important;
+    background: #f1f5f9 !important; color: #334155 !important;
+    font-size: 12px !important; font-weight: 600 !important;
 }
-
-/* ── Confirmation dialog ── */
-.confirm-overlay {
-    background: #fefce8 !important;
-    border: 1px solid #fbbf24 !important;
-    border-radius: 8px !important;
-    padding: 12px !important;
-    margin: 8px 0 !important;
+.preview-table th,
+.preview-table td {
+    padding: 7px 9px !important; border-right: 1px solid #dbe3ec !important;
+    border-bottom: 1px solid #dbe3ec !important; vertical-align: top !important;
 }
-.confirm-msg {
-    font-size: 0.85em;
-    color: #92400e;
-    margin-bottom: 8px;
-    line-height: 1.5;
+.preview-table th:last-child,
+.preview-table td:last-child { border-right: 0 !important; }
+.preview-table tbody tr:last-child td { border-bottom: 0 !important; }
+.preview-table tbody tr:nth-child(even) td { background: #f8fafc !important; }
+.preview-table tbody tr:hover td { background: #eef2ff !important; }
+.preview-table td { max-width: 540px; font-size: 12px !important; line-height: 1.4 !important; }
+.preview-table td .cell-wrap {
+    display: -webkit-box !important; max-height: 34px !important; overflow: hidden !important;
+    -webkit-box-orient: vertical; -webkit-line-clamp: 2;
 }
-
-/* ── Add dataset dialog — fixed centered modal ── */
-.add-dialog,
-.add-dialog > .gr-group {
-    position: fixed !important;
-    top: 50% !important;
-    left: 50% !important;
-    transform: translate(-50%, -50%) !important;
-    z-index: 1000 !important;
-    background: #fff !important;
-    border: 1px solid #c7d2fe !important;
-    border-radius: 12px !important;
-    padding: 24px !important;
-    width: 420px !important;
-    max-width: 90vw !important;
-    box-shadow: 0 0 0 9999px rgba(0,0,0,0.3), 0 20px 60px rgba(0,0,0,0.2) !important;
-    margin: 0 !important;
-    height: auto !important;
-    overflow: visible !important;
+/* Gradio 6 virtualizes body rows as divs, separately from its header table. */
+.preview-table .body-cell,
+.stats-table .body-cell {
+    border-right: 1px solid #dbe3ec !important;
+    border-bottom: 1px solid #dbe3ec !important;
 }
-
-.add-dialog-divider {
-    text-align: center;
-    color: #94a3b8;
-    font-size: 0.8em;
-    margin: 6px 0;
+.preview-table .body-cell:last-child,
+.stats-table .body-cell:last-child { border-right: 0 !important; }
+.preview-table .virtual-row:nth-child(even) .body-cell { background: #f8fafc; }
+.preview-table .virtual-row:hover .body-cell { background: #eef2ff !important; }
+.preview-table .body-cell .cell-wrap { padding: 8px 10px !important; }
+.preview-table .body-cell .text {
+    font: 13px/20px system-ui, sans-serif !important;
+    white-space: normal !important; overflow-wrap: anywhere;
+    display: -webkit-box !important; -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2; max-height: 40px; overflow: hidden;
 }
-
-/* ── Upload button inside add-dialog ── */
-.upload-btn {
-    width: 100% !important;
-    margin-bottom: 8px !important;
+.preview-table .body-cell:focus-within { outline: 2px solid #6366f1; outline-offset: -2px; }
+.log-area textarea {
+    font-family: ui-monospace, Menlo, monospace !important;
+    font-size: 12px !important; line-height: 1.6;
 }
-.upload-btn button {
-    width: 100% !important;
-    border: 1px dashed #a5b4fc !important;
-    background: #fff !important;
-    color: #4338ca !important;
-    font-size: 0.85em !important;
-    padding: 8px 12px !important;
-    border-radius: 6px !important;
-    cursor: pointer !important;
+#dataset-modal {
+    position: fixed !important; inset: 0; z-index: 100;
+    width: 100vw; height: 100dvh; background: #0f172a66;
+    box-sizing: border-box; padding: 16px; align-items: center; justify-content: center;
 }
-.upload-btn button:hover {
-    border-color: #6366f1 !important;
-    background: #eef2ff !important;
+#dataset-dialog-card {
+    width: min(520px, calc(100vw - 32px)) !important;
+    max-height: calc(100dvh - 40px); overflow-y: auto;
+    box-sizing: border-box; padding: 24px; border-radius: 12px;
+    background: white; border: 1px solid #cbd5e1;
+    box-shadow: 0 20px 50px #0f172a33;
+    flex: 0 1 auto !important; overscroll-behavior: contain;
 }
-
-/* ── Login overlay — full-screen cover over main app ── */
-.login-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    z-index: 9999;
-    background: #fff;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 0 20px;
-    max-width: none !important;
-    overflow-y: auto;
+@media (max-width: 800px) {
+    #sidebar { flex-basis: 220px !important; min-width: 220px !important; }
+    #main-panel { padding: 14px; }
+    .app-header small { display: none; }
 }
-.login-overlay > * {
-    max-width: 360px !important;
-    width: 100% !important;
-}
-
-/* ── Main app wrapper (no extra chrome) ── */
-.main-app-wrap {
-    padding: 0 !important;
-    border: none !important;
-    background: transparent !important;
-}
-
-/* ── Panel switching (idle / dataset / task) ── */
-.panel-hidden {
-    display: none !important;
-}
-.idle-message {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 60vh;
-    color: #94a3b8;
-    text-align: center;
+@media (max-width: 560px) {
+    .app-header { padding: 0 12px; gap: 8px; }
+    .app-header span { font-size: 11px; }
+    #workspace { height: auto; flex-wrap: wrap !important; }
+    #sidebar { flex: 1 1 100% !important; height: 300px; border-right: 0; }
+    #main-panel { height: auto; overflow: visible; }
+    .empty-state { margin-top: 24px; }
 }
 """

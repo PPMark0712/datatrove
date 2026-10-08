@@ -7,6 +7,9 @@ import tempfile
 import threading
 import time
 import zipfile
+import sys
+import signal
+from pathlib import Path
 
 
 WEBUI_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -18,11 +21,32 @@ os.makedirs(TASKS_DIR, exist_ok=True)
 os.makedirs(WORKSPACE_DIR, exist_ok=True)
 
 MAX_ROWS_PER_FILE = 5000
+RUN_LOCK = threading.RLock()
+RUNS = {}
+
+
+class PipelineStopped(Exception):
+    pass
+
+
+def check_stopped(task_id):
+    run = RUNS.get(task_id)
+    if run and run["cancel"].is_set():
+        raise PipelineStopped()
+
+
+def validate_dataset_name(name):
+    name = (name or "").strip()
+    if not name or name in (".", "..") or any(c in name for c in "/\\\0") or name.startswith("."):
+        raise ValueError("请输入有效的数据集名称，不能包含路径分隔符或以点开头")
+    return name
 
 
 class Task:
     def __init__(self, task_id: str = None):
         if task_id:
+            if not task_id.startswith("task_") or not task_id[5:].isdigit():
+                raise ValueError("无效的任务编号")
             self.task_id = task_id
         else:
             self.task_id = self._next_task_id()
@@ -54,6 +78,8 @@ class Task:
         self.set_status("created")
 
     def set_status(self, status: str, step: str = "", detail: str = ""):
+        if status not in ("stopped", "stopping"):
+            check_stopped(self.task_id)
         info = {"status": status, "step": step, "detail": detail, "timestamp": time.time()}
         tmp_fd, tmp_path = tempfile.mkstemp(dir=self.task_dir, suffix=".tmp")
         try:
@@ -100,13 +126,26 @@ class Task:
             f.write(name.strip())
 
     def stop(self):
-        self.set_status("stopped", detail="Stopped by user")
+        with RUN_LOCK:
+            run = RUNS.get(self.task_id)
+            if not run:
+                self.set_status("stopped", detail="任务已停止")
+                return
+            run["cancel"].set()
+            self.set_status("stopping", detail="正在停止进程，请稍候")
+            proc = run.get("proc")
+            if proc and proc.poll() is None:
+                try:
+                    os.killpg(proc.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
 
     def get_log(self) -> str:
         if not os.path.exists(self.log_file):
             return ""
-        with open(self.log_file, "r", encoding="utf-8", errors="replace") as f:
-            return f.read()
+        with open(self.log_file, "rb") as f:
+            f.seek(max(0, os.path.getsize(self.log_file) - 16000))
+            return f.read().decode("utf-8", errors="replace")
 
     def count_input_files(self) -> int:
         return len(glob_module.glob(os.path.join(self.input_dir, "*.jsonl")))
@@ -155,7 +194,11 @@ def receive_directory(dir_path: str, task_id: str = None) -> Task:
 
 
 def run_script(cmd: list, log_file: str, env: dict = None, timeout: int = None) -> int:
+    task_id = os.path.basename(os.path.dirname(log_file))
+    check_stopped(task_id)
+    cmd = [sys.executable if part == "python" and i == 0 else part for i, part in enumerate(cmd)]
     full_env = os.environ.copy()
+    full_env.setdefault("NLTK_DATA", os.path.join(WEBUI_DIR, ".cache", "nltk_data"))
     if env:
         full_env.update(env)
     with open(log_file, "a", encoding="utf-8") as log:
@@ -163,17 +206,33 @@ def run_script(cmd: list, log_file: str, env: dict = None, timeout: int = None) 
         log.write(f"[CMD] {' '.join(cmd)}\n")
         log.write(f"{'='*60}\n")
         log.flush()
-        proc = subprocess.Popen(
-            cmd, stdout=log, stderr=subprocess.STDOUT,
-            env=full_env, cwd=PROJECT_ROOT
-        )
+        with RUN_LOCK:
+            check_stopped(task_id)
+            proc = subprocess.Popen(
+                cmd, stdout=log, stderr=subprocess.STDOUT,
+                env=full_env, cwd=PROJECT_ROOT, start_new_session=True,
+            )
+            if task_id in RUNS:
+                RUNS[task_id]["proc"] = proc
         try:
-            proc.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
-            log.write(f"\n[TIMEOUT] Process killed after {timeout}s\n")
+            started = time.monotonic()
+            while proc.poll() is None:
+                try:
+                    proc.wait(timeout=0.5)
+                except subprocess.TimeoutExpired:
+                    cancelled = RUNS.get(task_id, {}).get("cancel")
+                    if (cancelled and cancelled.is_set()) or (timeout and time.monotonic() - started > timeout):
+                        try:
+                            os.killpg(proc.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                        proc.wait()
+        finally:
+            with RUN_LOCK:
+                if task_id in RUNS:
+                    RUNS[task_id]["proc"] = None
         log.write(f"\n[EXIT CODE] {proc.returncode}\n")
+    check_stopped(task_id)
     return proc.returncode
 
 
@@ -235,7 +294,15 @@ def step_data_clean(task: Task, config: dict, workers: int = 8):
     if ret != 0:
         task.set_status("error", "data_clean", f"Data cleaning failed with exit code {ret}")
         return False, input_dir
-    final_output = find_deepest_output(output_dir)
+    # Only deduplicated outputs are final; never fall back to language/quality
+    # intermediates or exclusion files. Flatten all selected languages uniquely.
+    final_output = os.path.join(output_dir, "final")
+    shutil.rmtree(final_output, ignore_errors=True)
+    os.makedirs(final_output)
+    for language in languages:
+        pattern = os.path.join(output_dir, "3_minhash_deduplication", language, "4_result", "output", "*.jsonl")
+        for path in sorted(glob_module.glob(pattern)):
+            shutil.copy2(path, os.path.join(final_output, f"{language}_{os.path.basename(path)}"))
     task.set_status("running", "data_clean", "Data cleaning done")
     return True, final_output
 
@@ -260,6 +327,25 @@ def step_calc_fcd(task: Task, config: dict, input_dir: str, workers: int = 8):
         task.set_status("error", "calc_fcd", f"FCD calculation failed with exit code {ret}")
         return False, ""
     score_path = os.path.join(output_dir, "fcd_score")
+    # Scores are rank-aligned JSON arrays; preserve that order and expose scores
+    # on output records so downloads and result previews include the calculation.
+    annotated = os.path.join(output_dir, "annotated")
+    shutil.rmtree(annotated, ignore_errors=True)
+    os.makedirs(annotated)
+    for rank, source in enumerate(sorted(Path(input_dir).glob("*.jsonl"))):
+        with open(os.path.join(score_path, f"{rank:05d}.json"), encoding="utf-8") as f:
+            scores = json.load(f)
+        index = 0
+        with source.open(encoding="utf-8") as src, (Path(annotated) / source.name).open("w", encoding="utf-8") as dest:
+            for line in src:
+                if not line.strip():
+                    continue
+                doc = json.loads(line)
+                doc.setdefault("metadata", {})["fcd_score"] = scores[index]
+                dest.write(json.dumps(doc, ensure_ascii=False) + "\n")
+                index += 1
+        if index != len(scores):
+            raise ValueError("FCD 分数数量与输入不一致，无法生成结果")
     task.set_status("running", "calc_fcd", "FCD scores computed")
     return True, score_path
 
@@ -353,33 +439,26 @@ def step_sample(task: Task, config: dict, input_dir: str, score_path: str, worke
 
 def step_merge_output(task: Task, result_dir: str, workers: int = 4):
     task.set_status("running", "merge_output", "Merging output files...")
-    jsonl_files = []
-    for root, dirs, files in os.walk(result_dir):
-        for f in files:
-            if f.endswith(".jsonl"):
-                jsonl_files.append(os.path.join(root, f))
-    if not jsonl_files:
-        task.set_status("error", "merge_output", "No jsonl files found in result directory")
-        return False
-    flat_dir = os.path.join(task.work_dir, "merge_input_flat")
-    os.makedirs(flat_dir, exist_ok=True)
-    for i, f in enumerate(jsonl_files):
-        shutil.copy2(f, os.path.join(flat_dir, f"{i:06d}.jsonl"))
-    cmd = [
-        "python", os.path.join(SCRIPTS_DIR, "merge_split", "merge.py"),
-        "--input_path", flat_dir,
-        "--output_path", os.path.join(task.work_dir, "merge"),
-        "--rows_per_file", str(MAX_ROWS_PER_FILE),
-        "--workers", str(workers),
-    ]
-    ret = run_script(cmd, task.log_file)
-    merge_result = os.path.join(task.work_dir, "merge", "result")
-    if ret != 0 or not os.path.exists(merge_result):
-        for f in jsonl_files:
-            shutil.copy2(f, task.output_dir)
-    else:
-        for f in glob_module.glob(os.path.join(merge_result, "*.jsonl")):
-            shutil.copy2(f, task.output_dir)
+    jsonl_files = sorted(Path(result_dir).rglob("*.jsonl"))
+    shutil.rmtree(task.output_dir, ignore_errors=True)
+    os.makedirs(task.output_dir)
+    # Stream into bounded shards, including a valid empty result.
+    index = 0
+    out = open(os.path.join(task.output_dir, "00000.jsonl"), "w", encoding="utf-8")
+    try:
+        for path in jsonl_files:
+            with path.open(encoding="utf-8") as source:
+                for line in source:
+                    if not line.strip():
+                        continue
+                    check_stopped(task.task_id)
+                    if index and index % MAX_ROWS_PER_FILE == 0:
+                        out.close()
+                        out = open(os.path.join(task.output_dir, f"{index // MAX_ROWS_PER_FILE:05d}.jsonl"), "w", encoding="utf-8")
+                    out.write(line.rstrip("\n") + "\n")
+                    index += 1
+    finally:
+        out.close()
     task.set_status("running", "merge_output", "Output merged")
     return True
 
@@ -397,12 +476,17 @@ def find_deepest_output(base_dir: str) -> str:
 
 
 def run_pipeline(task: Task, config: dict, workers: int = 8):
-    task.save_config(config)
     steps = config.get("steps", [])
     current_input_dir = get_split_input_dir(task)
     score_path = ""
 
     try:
+        if config.get("rerun", True):
+            for folder in (task.split_dir, task.work_dir, task.output_dir):
+                shutil.rmtree(folder, ignore_errors=True)
+                os.makedirs(folder)
+            Path(task.log_file).write_text("", encoding="utf-8")
+        task.save_config(config)
         if not step_split(task, workers):
             return
         current_input_dir = get_split_input_dir(task)
@@ -412,11 +496,16 @@ def run_pipeline(task: Task, config: dict, workers: int = 8):
             if not ok:
                 return
             current_input_dir = new_input
+            if not any(Path(current_input_dir).glob("*.jsonl")):
+                step_merge_output(task, current_input_dir, workers)
+                task.set_status("completed", detail="清洗完成：所有文档均被过滤，输出为 0 条")
+                return
 
         if "fcd" in steps:
             ok, score_path = step_calc_fcd(task, config, current_input_dir, workers)
             if not ok:
                 return
+            current_input_dir = os.path.join(task.work_dir, "fcd", "annotated")
             sample_config = config.get("sample", {})
             if sample_config.get("method") and sample_config.get("score_source") == "fcd":
                 ok, result_dir = step_sample(task, config, current_input_dir, score_path, workers)
@@ -434,35 +523,54 @@ def run_pipeline(task: Task, config: dict, workers: int = 8):
             return
 
         task.set_status("completed", detail="Pipeline finished successfully")
+    except PipelineStopped:
+        task.set_status("stopped", detail="任务已停止，可从已完成阶段继续")
     except Exception as e:
+        # Cancellation can occur while an exception is propagating.
+        if RUNS.get(task.task_id, {}).get("cancel", threading.Event()).is_set():
+            task.set_status("stopped", detail="任务已停止")
+            return
         task.set_status("error", detail=str(e))
         import traceback
         with open(task.log_file, "a", encoding="utf-8") as f:
             f.write(f"\n[EXCEPTION]\n{traceback.format_exc()}\n")
+    finally:
+        with RUN_LOCK:
+            RUNS.pop(task.task_id, None)
 
 
 def run_pipeline_async(task: Task, config: dict, workers: int = 8):
-    thread = threading.Thread(target=run_pipeline, args=(task, config, workers), daemon=True)
-    thread.start()
+    with RUN_LOCK:
+        if RUNS:
+            raise ValueError("已有任务正在运行或停止中，请等待完成")
+        task.set_status("running", detail="任务已提交")
+        RUNS[task.task_id] = {"cancel": threading.Event(), "proc": None}
+        thread = threading.Thread(target=run_pipeline, args=(task, config, workers), daemon=True)
+        thread.start()
     return thread
 
 
 def load_scores(task: Task, score_type: str = "fcd") -> list:
     if score_type == "fcd":
         score_dir = os.path.join(task.work_dir, "fcd", "fcd_score")
-    elif score_type == "gc":
+    elif score_type.startswith("gc:"):
         score_dir = os.path.join(task.work_dir, "cdf_gc", "1_gc_data", "6_normalized_gc")
     else:
         return []
     if not os.path.exists(score_dir):
         return []
     scores = []
+    if score_type == "fcd":
+        for path in sorted(Path(score_dir).glob("*.json")):
+            with path.open(encoding="utf-8") as source:
+                scores.extend(float(value) for value in json.load(source))
+        return scores
     for f in sorted(glob_module.glob(os.path.join(score_dir, "*.jsonl"))):
         with open(f, encoding="utf-8", errors="replace") as fh:
             for line in fh:
                 try:
                     item = json.loads(line)
-                    score = None
+                    score = item.get("normalized_gc", {}).get(score_type.split(":")[-1])
                     for key in ("score", "fcd_score", "gc_score"):
                         if key in item and item[key] is not None:
                             score = item[key]
@@ -551,28 +659,59 @@ def list_tasks() -> list:
 def stage_upload(files=None, dir_path=None) -> str:
     """Copy uploaded files to a staging directory. Returns staging path."""
     staging = tempfile.mkdtemp(dir=WORKSPACE_DIR, prefix=".staging_")
-    if files:
-        for f in files:
-            fname = f.name if hasattr(f, "name") else str(f)
-            basename = os.path.basename(fname)
-            if basename.lower().endswith(".zip"):
-                with zipfile.ZipFile(fname) as zf:
-                    for member in zf.namelist():
-                        if member.endswith(".jsonl") and "__MACOSX" not in member:
-                            target = os.path.join(staging, os.path.basename(member))
-                            with zf.open(member) as src_f, open(target, "wb") as dst_f:
-                                shutil.copyfileobj(src_f, dst_f)
-            else:
-                shutil.copy2(fname, os.path.join(staging, basename))
-    elif dir_path and os.path.isdir(dir_path):
-        for f in glob_module.glob(os.path.join(dir_path, "*.jsonl")):
-            shutil.copy2(f, os.path.join(staging, os.path.basename(f)))
+    def target_path(name):
+        target = Path(staging) / (Path(name).stem + ".jsonl")
+        index = 1
+        while target.exists():
+            target = Path(staging) / f"{Path(name).stem}_{index}.jsonl"
+            index += 1
+        return target
+
+    try:
+        if files:
+            for f in files:
+                fname = f.name if hasattr(f, "name") else str(f)
+                if fname.lower().endswith(".zip"):
+                    with zipfile.ZipFile(fname) as zf:
+                        for member in zf.namelist():
+                            if member.lower().endswith(".jsonl") and "__MACOSX" not in member:
+                                with zf.open(member) as src_f, target_path(member).open("wb") as dst_f:
+                                    shutil.copyfileobj(src_f, dst_f)
+                elif fname.lower().endswith(".jsonl"):
+                    shutil.copy2(fname, target_path(fname))
+                else:
+                    raise ValueError("只支持 JSONL 文件或包含 JSONL 的 ZIP")
+        elif dir_path and os.path.isdir(dir_path):
+            for path in sorted(Path(dir_path).rglob("*.jsonl")):
+                shutil.copy2(path, target_path(path.name))
+        else:
+            raise ValueError("请上传文件，或填写存在的服务器目录")
+        rows = 0
+        for path in Path(staging).glob("*"):
+            with path.open(encoding="utf-8") as source:
+                for number, line in enumerate(source, 1):
+                    if not line.strip():
+                        continue
+                    try:
+                        doc = json.loads(line)
+                    except json.JSONDecodeError as exc:
+                        raise ValueError(f"{path.name} 第 {number} 行不是有效 JSON") from exc
+                    if not isinstance(doc, dict) or not isinstance(doc.get("text"), str) or not doc["text"].strip():
+                        raise ValueError(f"{path.name} 第 {number} 行需要非空的 text 字符串")
+                    if "metadata" in doc and not isinstance(doc["metadata"], dict):
+                        raise ValueError(f"{path.name} 第 {number} 行的 metadata 必须是 JSON 对象")
+                    rows += 1
+        if not rows:
+            raise ValueError("未找到有效记录，请上传包含 text 字段的 JSONL 文件")
+    except Exception:
+        cancel_upload(staging)
+        raise
     return staging
 
 
 def confirm_upload(staging_dir: str, name: str) -> str:
     """Move staged files to workspace under the given name. Returns final name."""
-    name = name.strip().replace(" ", "_") if name else time.strftime("%Y%m%d_%H%M%S")
+    name = validate_dataset_name(name)
     dest = os.path.join(WORKSPACE_DIR, name)
     if os.path.exists(dest):
         i = 1
@@ -592,7 +731,8 @@ def cancel_upload(staging_dir: str):
 
 def rename_dataset(old_name: str, new_name: str) -> bool:
     """Rename a workspace dataset directory."""
-    if not old_name or not new_name or old_name == new_name:
+    old_name, new_name = validate_dataset_name(old_name), validate_dataset_name(new_name)
+    if old_name == new_name:
         return False
     old_path = os.path.join(WORKSPACE_DIR, old_name)
     new_path = os.path.join(WORKSPACE_DIR, new_name)
@@ -620,6 +760,9 @@ def list_workspace_datasets():
 
 
 def create_task_from_workspace(dataset_name: str) -> Task:
+    src = os.path.join(WORKSPACE_DIR, validate_dataset_name(dataset_name))
+    if not glob_module.glob(os.path.join(src, "*.jsonl")):
+        raise ValueError("数据集不存在或没有 JSONL 文件，请重新选择")
     task = Task()
     task.init()
     src = os.path.join(WORKSPACE_DIR, dataset_name)
@@ -630,7 +773,10 @@ def create_task_from_workspace(dataset_name: str) -> Task:
 
 
 def save_output_as_dataset(task: Task, dataset_name: str) -> str:
-    dataset_name = dataset_name.strip().replace(" ", "_") if dataset_name else f"result_{task.task_id}"
+    dataset_name = validate_dataset_name(dataset_name)
+    jsonl_files = glob_module.glob(os.path.join(task.output_dir, "*.jsonl"))
+    if not jsonl_files or not any(os.path.getsize(f) for f in jsonl_files):
+        return ""
     dest = os.path.join(WORKSPACE_DIR, dataset_name)
     if os.path.exists(dest):
         i = 1
@@ -639,7 +785,6 @@ def save_output_as_dataset(task: Task, dataset_name: str) -> str:
         dest = f"{dest}_{i}"
         dataset_name = os.path.basename(dest)
     os.makedirs(dest, exist_ok=True)
-    jsonl_files = glob_module.glob(os.path.join(task.output_dir, "*.jsonl"))
     if not jsonl_files:
         return ""
     for f in jsonl_files:

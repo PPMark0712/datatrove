@@ -42,7 +42,7 @@ gpu = [
   "ltp",
 ]
 webui = [
-  "gradio>=4.0",
+  "gradio>=6.26,<7",
   "matplotlib",
 ]
 cli = [
@@ -184,4 +184,3 @@ lines-after-imports = 2
 known-first-party = [
   "datatrove"
 ]
-
