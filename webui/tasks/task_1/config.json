@@ -1,0 +1,30 @@
+{
+  "steps": [
+    "data_clean",
+    "fcd"
+  ],
+  "languages": [
+    "en"
+  ],
+  "workers": 4,
+  "rerun": true,
+  "fcd_params": {
+    "freq_scaling_factor": 0.7,
+    "w_f": 0.5,
+    "noun_weight": 0.7
+  },
+  "gc_params": {
+    "sample_rate": 0.2,
+    "language": "zh",
+    "tokenizer_path": "",
+    "ltp_model_path": "",
+    "cuda_visible_devices": "0",
+    "workers_per_gpu": 4
+  },
+  "sample": {
+    "method": "hard",
+    "sample_rate": 0.5,
+    "unit": "doc",
+    "score_source": "fcd"
+  }
+}

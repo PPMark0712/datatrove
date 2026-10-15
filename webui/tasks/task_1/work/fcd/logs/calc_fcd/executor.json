@@ -1,0 +1,49 @@
+{
+    "pipeline": [
+        {
+            "limit": -1,
+            "skip": 0,
+            "text_key": "text",
+            "id_key": "id",
+            "adapter": "<bound method input_adapter of \ud83d\udcd6 - READER: \ud83d\udc3f Jsonl>",
+            "_empty_warning": false,
+            "default_metadata": null,
+            "data_folder": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/data_clean/final', fs=<fsspec.implementations.local.LocalFileSystem object at 0x11c31cad0>)",
+            "paths_file": null,
+            "recursive": true,
+            "glob_pattern": null,
+            "shuffle_files": false,
+            "file_progress": false,
+            "doc_progress": false,
+            "compression": "infer"
+        },
+        {
+            "output_folder": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/fcd/fcd_score', fs=<fsspec.implementations.local.LocalFileSystem object at 0x11c31cad0>)",
+            "kwargs": {
+                "nltk_path": null
+            },
+            "w_f": 0.5,
+            "basic_words_path": "/Users/bytedance/yyz/graduation/projects/datatrove/src/datatrove/pipeline/fcd/build_dict/data/basic_words.txt",
+            "dis_to_basic_path": "/Users/bytedance/yyz/graduation/projects/datatrove/src/datatrove/pipeline/fcd/build_dict/data/dis_to_basic.txt",
+            "word_freq_path": "/Users/bytedance/yyz/graduation/projects/datatrove/src/datatrove/pipeline/fcd/build_dict/data/word_freq.txt",
+            "freq_scaling_factor": 0.7,
+            "power_mean_alpha": 1.5,
+            "agg_top_quantile": 0.9,
+            "agg_top_weight": 0.7,
+            "noun_weight": 0.7,
+            "log_freq_center": null,
+            "log_freq_quantile": 0.1
+        }
+    ],
+    "logging_dir": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/fcd/logs/calc_fcd', fs=<fsspec.implementations.local.LocalFileSystem object at 0x11c31cad0>)",
+    "skip_completed": true,
+    "randomize_start_duration": 0,
+    "tasks": 1,
+    "workers": 1,
+    "start_method": "forkserver",
+    "local_tasks": 1,
+    "local_rank_offset": 0,
+    "depends": null,
+    "_launched": true,
+    "world_size": 1
+}

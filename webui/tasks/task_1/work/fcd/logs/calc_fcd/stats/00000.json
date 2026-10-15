@@ -1,0 +1,49 @@
+[
+    {
+        "name": "\ud83d\udcd6 - READER: \ud83d\udc3f Jsonl",
+        "time_stats": {
+            "total": 0.00013833283446729183,
+            "n": 10,
+            "mean": 1.3833283446729183e-05,
+            "variance": 1.4285025641462885e-10,
+            "std_dev": 1.195199800931329e-05,
+            "min": 6.541842594742775e-06,
+            "max": 4.475004971027374e-05,
+            "total_human": "0 seconds",
+            "mean_human": "0.01 milliseconds",
+            "std_dev_human": "0.01 milliseconds",
+            "min_human": "0.01 milliseconds",
+            "max_human": "0.04 milliseconds"
+        },
+        "stats": {
+            "input_files": 1,
+            "doc_len": {
+                "total": 5954,
+                "n": 10,
+                "mean": 595.4,
+                "variance": 2314.0444444444465,
+                "std_dev": 48.10451584253236,
+                "min": 519,
+                "max": 661
+            },
+            "documents": {
+                "total": 10,
+                "mean": 10.0,
+                "unit": "input_file"
+            }
+        }
+    },
+    {
+        "name": "FCD: Frequency-Concept Difficulty Calculator",
+        "time_stats": {
+            "total": 1.2078193330671638,
+            "mean": 1.2078193330671638,
+            "total_human": "1.21 seconds",
+            "mean_human": "1 second and 207.82 milliseconds",
+            "std_dev_human": "0 milliseconds",
+            "min_human": "1 second and 207.82 milliseconds",
+            "max_human": "1 second and 207.82 milliseconds"
+        },
+        "stats": {}
+    }
+]

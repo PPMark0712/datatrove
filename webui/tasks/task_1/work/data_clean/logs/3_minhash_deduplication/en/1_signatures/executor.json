@@ -1,0 +1,60 @@
+{
+    "pipeline": [
+        {
+            "limit": -1,
+            "skip": 0,
+            "text_key": "text",
+            "id_key": "id",
+            "adapter": "<bound method processed_input_adapter of \ud83d\udcd6 - READER: \ud83d\udc3f Jsonl>",
+            "_empty_warning": false,
+            "default_metadata": null,
+            "data_folder": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/data_clean/2_quality_filter/en/output', fs=<fsspec.implementations.local.LocalFileSystem object at 0x11376a120>)",
+            "paths_file": null,
+            "recursive": true,
+            "glob_pattern": null,
+            "shuffle_files": false,
+            "file_progress": false,
+            "doc_progress": false,
+            "compression": "infer"
+        },
+        {
+            "output_folder": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/data_clean/3_minhash_deduplication/en/1_signatures', fs=<fsspec.implementations.local.LocalFileSystem object at 0x11376a120>)",
+            "config": {
+                "n_grams": 5,
+                "num_buckets": 14,
+                "hashes_per_bucket": 8,
+                "seed": 1,
+                "norm_config": {
+                    "lowercase": true,
+                    "norm_whitespace": true,
+                    "remove_punctuation": true,
+                    "norm_unicode_diacritics": true,
+                    "norm_numbers": true,
+                    "norm_weekdays": false,
+                    "norm_monthnames": false
+                },
+                "hash_config": {
+                    "precision": 64,
+                    "hash_fc": "sha1"
+                }
+            },
+            "num_hashes": 112,
+            "_parameters": null,
+            "_hash_func": "<function sha1_hash64 at 0x1122336a0>",
+            "language": "en",
+            "_word_tokenizer": null,
+            "skip_existing_sigs": false
+        }
+    ],
+    "logging_dir": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/data_clean/logs/3_minhash_deduplication/en/1_signatures', fs=<fsspec.implementations.local.LocalFileSystem object at 0x11376a120>)",
+    "skip_completed": true,
+    "randomize_start_duration": 0,
+    "tasks": 1,
+    "workers": 1,
+    "start_method": "forkserver",
+    "local_tasks": 1,
+    "local_rank_offset": 0,
+    "depends": null,
+    "_launched": true,
+    "world_size": 1
+}

@@ -1,0 +1,49 @@
+{
+    "pipeline": [
+        {
+            "limit": -1,
+            "skip": 0,
+            "text_key": "text",
+            "id_key": "id",
+            "adapter": "<bound method input_adapter of \ud83d\udcd6 - READER: \ud83d\udc3f Jsonl>",
+            "_empty_warning": false,
+            "default_metadata": null,
+            "data_folder": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/fcd/annotated', fs=<fsspec.implementations.local.LocalFileSystem object at 0x1098d9010>)",
+            "paths_file": null,
+            "recursive": true,
+            "glob_pattern": null,
+            "shuffle_files": false,
+            "file_progress": false,
+            "doc_progress": false,
+            "compression": "infer"
+        },
+        {
+            "score_folder": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/fcd/fcd_score', fs=<fsspec.implementations.local.LocalFileSystem object at 0x1098d9010>)",
+            "sample_rate": 0.5,
+            "higher_is_better": true,
+            "unit": "doc",
+            "token_count_folder": null
+        },
+        {
+            "compression": null,
+            "output_folder": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/sample/result', fs=<fsspec.implementations.local.LocalFileSystem object at 0x1098d9010>)",
+            "max_file_size": -1,
+            "file_id_counter": {},
+            "output_filename": "<string.Template object at 0x1098d9a90>",
+            "output_mg": "<datatrove.io.OutputFileManager object at 0x1098d9be0>",
+            "adapter": "<bound method output_adapter of \ud83d\udcbd - WRITER: \ud83d\udc3f Jsonl>",
+            "expand_metadata": false
+        }
+    ],
+    "logging_dir": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/sample/logs', fs=<fsspec.implementations.local.LocalFileSystem object at 0x1098d9010>)",
+    "skip_completed": true,
+    "randomize_start_duration": 0,
+    "tasks": 1,
+    "workers": 1,
+    "start_method": "forkserver",
+    "local_tasks": 1,
+    "local_rank_offset": 0,
+    "depends": null,
+    "_launched": true,
+    "world_size": 1
+}

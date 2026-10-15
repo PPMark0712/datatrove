@@ -1,0 +1,79 @@
+[
+    {
+        "name": "\ud83d\udcd6 - READER: \ud83d\udc3f Jsonl",
+        "time_stats": {
+            "total": 0.00010679150000214577,
+            "n": 10,
+            "mean": 1.0679150000214576e-05,
+            "variance": 4.22165522678819e-10,
+            "std_dev": 2.054666694816507e-05,
+            "min": 2.499902620911598e-06,
+            "max": 6.88750296831131e-05,
+            "total_human": "0 seconds",
+            "mean_human": "0.01 milliseconds",
+            "std_dev_human": "0.02 milliseconds",
+            "min_human": "0 milliseconds",
+            "max_human": "0.07 milliseconds"
+        },
+        "stats": {
+            "input_files": 1,
+            "doc_len": {
+                "total": 5954,
+                "n": 10,
+                "mean": 595.4,
+                "variance": 2314.0444444444465,
+                "std_dev": 48.10451584253236,
+                "min": 519,
+                "max": 661
+            },
+            "documents": {
+                "total": 10,
+                "mean": 10.0,
+                "unit": "input_file"
+            }
+        }
+    },
+    {
+        "name": "Sampler: Hard Sampler",
+        "time_stats": {
+            "total": 0.047393374843522906,
+            "mean": 0.047393374843522906,
+            "total_human": "0.05 seconds",
+            "mean_human": "47.39 milliseconds",
+            "std_dev_human": "0 milliseconds",
+            "min_human": "47.39 milliseconds",
+            "max_human": "47.39 milliseconds"
+        },
+        "stats": {}
+    },
+    {
+        "name": "\ud83d\udcbd - WRITER: \ud83d\udc3f Jsonl",
+        "time_stats": {
+            "total": 0.002145127160474658,
+            "n": 5,
+            "mean": 0.0004290254320949316,
+            "variance": 8.7858452336123e-07,
+            "std_dev": 0.0009373283967538965,
+            "min": 6.208894774317741e-06,
+            "max": 0.002105749910697341,
+            "total_human": "0 seconds",
+            "mean_human": "0.43 milliseconds",
+            "std_dev_human": "0.94 milliseconds",
+            "min_human": "0.01 milliseconds",
+            "max_human": "2.11 milliseconds"
+        },
+        "stats": {
+            "XXXXX.jsonl": 5,
+            "total": 5,
+            "doc_len": {
+                "total": 2980,
+                "n": 5,
+                "mean": 596.0,
+                "variance": 2942.5,
+                "std_dev": 54.244815420462075,
+                "min": 519,
+                "max": 661
+            }
+        }
+    }
+]

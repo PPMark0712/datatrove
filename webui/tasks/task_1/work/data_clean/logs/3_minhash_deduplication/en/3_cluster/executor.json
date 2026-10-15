@@ -1,0 +1,148 @@
+{
+    "pipeline": [
+        {
+            "input_folder": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/data_clean/3_minhash_deduplication/en/2_buckets', fs=<fsspec.implementations.local.LocalFileSystem object at 0x11376a120>)",
+            "output_folder": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/data_clean/3_minhash_deduplication/en/3_remove_ids', fs=<fsspec.implementations.local.LocalFileSystem object at 0x11376a120>)",
+            "config": {
+                "n_grams": 5,
+                "num_buckets": 14,
+                "hashes_per_bucket": 8,
+                "seed": 1,
+                "norm_config": {
+                    "lowercase": true,
+                    "norm_whitespace": true,
+                    "remove_punctuation": true,
+                    "norm_unicode_diacritics": true,
+                    "norm_numbers": true,
+                    "norm_weekdays": false,
+                    "norm_monthnames": false
+                },
+                "hash_config": {
+                    "precision": 64,
+                    "hash_fc": "sha1"
+                }
+            },
+            "save_cluster_id": false,
+            "save_cluster_size": false,
+            "ignore_index_matches": false,
+            "lines_to_buffer": 5
+        }
+    ],
+    "logging_dir": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/data_clean/logs/3_minhash_deduplication/en/3_cluster', fs=<fsspec.implementations.local.LocalFileSystem object at 0x11376a120>)",
+    "skip_completed": true,
+    "randomize_start_duration": 0,
+    "tasks": 1,
+    "workers": 1,
+    "start_method": "forkserver",
+    "local_tasks": 1,
+    "local_rank_offset": 0,
+    "depends": {
+        "pipeline": [
+            {
+                "input_folder": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/data_clean/3_minhash_deduplication/en/1_signatures', fs=<fsspec.implementations.local.LocalFileSystem object at 0x11376a120>)",
+                "output_folder": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/data_clean/3_minhash_deduplication/en/2_buckets', fs=<fsspec.implementations.local.LocalFileSystem object at 0x11376a120>)",
+                "index_folder": null,
+                "config": {
+                    "n_grams": 5,
+                    "num_buckets": 14,
+                    "hashes_per_bucket": 8,
+                    "seed": 1,
+                    "norm_config": {
+                        "lowercase": true,
+                        "norm_whitespace": true,
+                        "remove_punctuation": true,
+                        "norm_unicode_diacritics": true,
+                        "norm_numbers": true,
+                        "norm_weekdays": false,
+                        "norm_monthnames": false
+                    },
+                    "hash_config": {
+                        "precision": 64,
+                        "hash_fc": "sha1"
+                    }
+                },
+                "only_dedup_in_index": true,
+                "create_index_name": null,
+                "lines_to_buffer": 5,
+                "_local_rank": 0
+            }
+        ],
+        "logging_dir": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/data_clean/logs/3_minhash_deduplication/en/2_buckets', fs=<fsspec.implementations.local.LocalFileSystem object at 0x11376a120>)",
+        "skip_completed": true,
+        "randomize_start_duration": 0,
+        "tasks": 14,
+        "workers": 1,
+        "start_method": "forkserver",
+        "local_tasks": 14,
+        "local_rank_offset": 0,
+        "depends": {
+            "pipeline": [
+                {
+                    "limit": -1,
+                    "skip": 0,
+                    "text_key": "text",
+                    "id_key": "id",
+                    "adapter": "<bound method processed_input_adapter of \ud83d\udcd6 - READER: \ud83d\udc3f Jsonl>",
+                    "_empty_warning": false,
+                    "default_metadata": null,
+                    "data_folder": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/data_clean/2_quality_filter/en/output', fs=<fsspec.implementations.local.LocalFileSystem object at 0x11376a120>)",
+                    "paths_file": null,
+                    "recursive": true,
+                    "glob_pattern": null,
+                    "shuffle_files": false,
+                    "file_progress": false,
+                    "doc_progress": false,
+                    "compression": "infer",
+                    "_local_rank": 0
+                },
+                {
+                    "output_folder": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/data_clean/3_minhash_deduplication/en/1_signatures', fs=<fsspec.implementations.local.LocalFileSystem object at 0x11376a120>)",
+                    "config": {
+                        "n_grams": 5,
+                        "num_buckets": 14,
+                        "hashes_per_bucket": 8,
+                        "seed": 1,
+                        "norm_config": {
+                            "lowercase": true,
+                            "norm_whitespace": true,
+                            "remove_punctuation": true,
+                            "norm_unicode_diacritics": true,
+                            "norm_numbers": true,
+                            "norm_weekdays": false,
+                            "norm_monthnames": false
+                        },
+                        "hash_config": {
+                            "precision": 64,
+                            "hash_fc": "sha1"
+                        }
+                    },
+                    "num_hashes": 112,
+                    "_parameters": [
+                        "[[ 775169054918279404 1758426461858698313    2109959069025162\n   965365488286768774  401325382989534145 1703346441743126658\n  1130051441076870728 1762784241922636285  401538927472639258\n   716042322565387541  815244983797985638 1110853719534651861\n  1465635305079316733   57506563652686493  505211975917066639\n   838727479550634565  780385900265431000 1082636226378482418\n   283838892089191903 1348484356917986391  936072031995811818\n  1720372350978982920 1169969703377029950 1241883087124931898\n    25625226007148417  361679113657972946 1568788725991793369\n   720433610630797940  826975332961259499   57968974610545097\n  1814178924063827016  850535481772967367 1529041984443575858\n   611791605100360196 1233664984050117401 1208550132088437804\n  1134491820483890203 1561068142528832849  337359223002198900\n     2662096424693203 2100366343476833345 2272005282452877338\n   561592535218511587  724575788541486984 1904183826989973146\n  1344648193880622103  619727673435799236  804538942828528767\n   696832086074912126   92760730228048028  357257325660623162\n   993090257743735975 1598006598579725601  286785215429783307\n  2150395256084530832  984365201973288024 1367228525499322312\n   400821414621316445 1647396391822001343 1379048364047586209\n  1887737050569905304  720455784159192386 1280206955645314894\n   722729898864855937  921478673934505214  662171862886500103\n   715634959063503318  274655559890433539 1283796700206534620\n  1596658653041296076  523922820580841550  230117649494758476\n   263352056799233068 1058682450511224351  418313753765229416\n   744403489731186478  968612313319578170 1803461786564664829\n    14980651099439201 1863084026736552971  153220345614122877\n  2281349539356141448   17384899557965977 1824352345109249501\n   367604757747313057  385282673040866498  979359603628154429\n  1657256394417291417  709120483056161652 2244889800033437827\n  2116689543321462493 1374084313144276835 1381884949962268343\n  1446033029236275690  611266146699233751 2066532958085233347\n   523509680078012392 1359146662721091127   52948149690579846\n  2160942293751064747 1413848896402184823  499133954986498327\n   201846032685059982 1978777819965811315  618614248984827574\n  2275592508583382027  291850381902561464 1004189732771057209\n  1215583606649627030 2256458337378950241  873278286232559572\n   223865076026037746]]",
+                        "[[1062448801025099917 1324811268927594100 1217488311597731462\n   100775521383383736   71503144720579471  885896412999398395\n  1596100048030278082 2292394638421159733  366723709801908644\n   483507374032440056  522162562461265192 2235949585210378459\n  2029657444881885553  716306739587483085  974393427803837902\n  1697670337010853719 2290593402415132572  538343888607264301\n  1581979269522776948 1744983512659606478 1125808846525888896\n   343981791039746111  934007963372074531 1991773790767872477\n  1053404851543353986  237237038733719123 2094477501324246838\n  2252746632473157885 1037449266289342519  211311645193258271\n  1105286383762747614 2238391591237301384  821837035338323555\n  1982916584933322248 1857759398970506189 1623110274942190159\n  1101583836342502208  231616986851349715 1327691181208577137\n  1702197838485543700 1256231807310832911 1444255381494669787\n    42902454742971891 2191950179549041915 1299194599953098987\n  1500807354596368775 1752809426824068149 1786176085821440878\n  2118567300926164723 2190914504203751524 2212792323624167200\n  1456940403417483715  586447722759106259  342670382210209374\n  1291680585167188655 2053954687016252293 1961432329506782783\n  1270084851437757527 1242617054144874282 2095848151477744322\n  1471039734164907746   94837956732254865  939828747546450752\n  2219778448427847156  815952863767273617  275217274352977059\n  1223661685133629084 2215162532383274790   87022673460369866\n  1571183205760722246   50831080378748134 1227381464362988592\n   190280048193181630 1010043456706110057 1262389667950943488\n   266756186393216503  455086835550584083  918794838454833776\n   245282199234122803 1216767326165072010 2030358702377275716\n   409112435725675790  605345743814266389 1050949148475592060\n   257361052164127160 2017374420125007056 2154180424385901110\n  1365360136487033415 1386754629279803918 1045066892334153871\n   749055048214673205  305592579266007545  276843534351670229\n  2047416485587801838 1924188903974864428  913997788746244246\n   944130688119949750  806739497089626636  366640366875901243\n  1628156380473706444  903072637067301591   24525324454322813\n   185927603917723084  104448596761453350  397062628907991664\n  1346062807897531205 1422529324905212321  277051278387475866\n   944404313172274117 1513805725792048436  110622250926641691\n  1097409548522419201]]"
+                    ],
+                    "_hash_func": "<function sha1_hash64 at 0x1122336a0>",
+                    "language": "en",
+                    "_word_tokenizer": "<datatrove.utils.word_tokenizers.SpaCyTokenizer object at 0x1139f0440>",
+                    "skip_existing_sigs": false,
+                    "_local_rank": 0
+                }
+            ],
+            "logging_dir": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/data_clean/logs/3_minhash_deduplication/en/1_signatures', fs=<fsspec.implementations.local.LocalFileSystem object at 0x11376a120>)",
+            "skip_completed": true,
+            "randomize_start_duration": 0,
+            "tasks": 1,
+            "workers": 1,
+            "start_method": "forkserver",
+            "local_tasks": 1,
+            "local_rank_offset": 0,
+            "depends": null,
+            "_launched": true,
+            "world_size": 1
+        },
+        "_launched": true,
+        "world_size": 14
+    },
+    "_launched": true,
+    "world_size": 1
+}

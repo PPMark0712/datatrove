@@ -1,0 +1,77 @@
+{
+    "pipeline": [
+        {
+            "limit": -1,
+            "skip": 0,
+            "text_key": "text",
+            "id_key": "id",
+            "adapter": "<bound method raw_input_adapter of \ud83d\udcd6 - READER: \ud83d\udc3f Jsonl>",
+            "_empty_warning": false,
+            "default_metadata": null,
+            "data_folder": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/input', fs=<fsspec.implementations.local.LocalFileSystem object at 0x11376a120>)",
+            "paths_file": null,
+            "recursive": true,
+            "glob_pattern": null,
+            "shuffle_files": false,
+            "file_progress": false,
+            "doc_progress": false,
+            "compression": "infer"
+        },
+        {
+            "exclusion_writer": {
+                "compression": null,
+                "output_folder": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/data_clean/1_language_filter/removed/1_other_languages', fs=<fsspec.implementations.local.LocalFileSystem object at 0x11376a120>)",
+                "max_file_size": -1,
+                "file_id_counter": {},
+                "output_filename": "<string.Template object at 0x11376aa50>",
+                "output_mg": "<datatrove.io.OutputFileManager object at 0x11376aba0>",
+                "adapter": "<bound method output_adapter of \ud83d\udcbd - WRITER: \ud83d\udc3f Jsonl>",
+                "expand_metadata": false
+            },
+            "batch_size": 1,
+            "language_threshold": 0.65,
+            "languages": [
+                "en"
+            ],
+            "backend": "ft176",
+            "model": "<datatrove.utils.lid.FT176LID object at 0x11376ae40>",
+            "label_only": false,
+            "keep_top_pairs_threshold": -1
+        },
+        {
+            "exclusion_writer": {
+                "compression": null,
+                "output_folder": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/data_clean/1_language_filter/removed/2_below_language_score_threshold', fs=<fsspec.implementations.local.LocalFileSystem object at 0x11376a120>)",
+                "max_file_size": -1,
+                "file_id_counter": {},
+                "output_filename": "<string.Template object at 0x1137f4b90>",
+                "output_mg": "<datatrove.io.OutputFileManager object at 0x1137f4cd0>",
+                "adapter": "<bound method output_adapter of \ud83d\udcbd - WRITER: \ud83d\udc3f Jsonl>",
+                "expand_metadata": false
+            },
+            "batch_size": 1,
+            "filter_function": "functools.partial(<function main.<locals>.above_language_threshold at 0x1137d1440>, language_threshold=0.65)"
+        },
+        {
+            "compression": null,
+            "output_folder": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/data_clean/1_language_filter/output', fs=<fsspec.implementations.local.LocalFileSystem object at 0x11376a120>)",
+            "max_file_size": -1,
+            "file_id_counter": {},
+            "output_filename": "<string.Template object at 0x1137f4f50>",
+            "output_mg": "<datatrove.io.OutputFileManager object at 0x1137f5090>",
+            "adapter": "<bound method output_adapter of \ud83d\udcbd - WRITER: \ud83d\udc3f Jsonl>",
+            "expand_metadata": false
+        }
+    ],
+    "logging_dir": "DataFolder(path='/Users/bytedance/yyz/graduation/projects/datatrove/webui/tasks/task_1/work/data_clean/logs/1_language_filter', fs=<fsspec.implementations.local.LocalFileSystem object at 0x11376a120>)",
+    "skip_completed": true,
+    "randomize_start_duration": 0,
+    "tasks": 1,
+    "workers": 1,
+    "start_method": "forkserver",
+    "local_tasks": 1,
+    "local_rank_offset": 0,
+    "depends": null,
+    "_launched": true,
+    "world_size": 1
+}
