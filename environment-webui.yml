@@ -1,0 +1,19 @@
+name: datatrove
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - -e .[webui,cli]
+      - fasttext-numpy2-wheel; sys_platform != 'win32'
+      - fasteners
+      - ftfy
+      - regex
+      - xxhash
+      - tldextract
+      - trafilatura>=1.8.0,<1.12.0
+      - inscriptis
+      - pyahocorasick
+      - zstandard
+      - spacy>=3.8
+      - pytest
+      - psutil

@@ -309,7 +309,7 @@ def build_app():
 
         show_view(start.click(start_task, [current_task] + config_inputs))
 
-        def resume_task(tid):
+        def resume_task(tid, task_drafts):
             task = Task(tid)
             config = task.load_config()
             if not config or task.get_status().get("status") not in ("error", "stopped"):
@@ -319,8 +319,11 @@ def build_app():
                 run_pipeline_async(task, config, config.get("workers", 4))
             except ValueError as exc:
                 raise gr.Error(str(exc)) from exc
+            gr.Info("继续运行已恢复上次运行配置")
+            return {key: value for key, value in task_drafts.items() if key != tid}
 
-        show_view(resume.click(resume_task, current_task))
+        show_view(resume.click(resume_task, [current_task, drafts], drafts,
+                               concurrency_id="view-state"))
         show_view(stop.click(lambda tid: Task(tid).stop(), current_task))
         def poll(tid, previous, task_drafts, force=False):
             unchanged = (gr.skip(),) * (18 + len(config_inputs))

@@ -9,6 +9,7 @@ import time
 import zipfile
 import sys
 import signal
+from functools import lru_cache
 from pathlib import Path
 
 
@@ -23,6 +24,44 @@ os.makedirs(WORKSPACE_DIR, exist_ok=True)
 MAX_ROWS_PER_FILE = 5000
 RUN_LOCK = threading.RLock()
 RUNS = {}
+
+
+@lru_cache(maxsize=128)
+def _count_rows(files):
+    total = 0
+    for path, mtime_ns, size in files:
+        with open(path, encoding="utf-8", errors="replace") as source:
+            total += sum(bool(line.strip()) for line in source)
+    return total
+
+
+def count_jsonl_rows(paths):
+    """Reuse counts until a file's size or modification time changes."""
+    files = []
+    for path in paths:
+        path = Path(path).resolve()
+        info = path.stat()
+        files.append((str(path), info.st_mtime_ns, info.st_size))
+    return _count_rows(tuple(sorted(files)))
+
+
+def terminate_process_tree(proc, force=False):
+    if proc.poll() is not None:
+        return
+    if os.name == "nt":
+        # terminate()/kill() only stop the parent on Windows. Workers must stop too.
+        result = subprocess.run(
+            ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+            capture_output=True, timeout=10,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        if result.returncode and proc.poll() is None:
+            raise RuntimeError(f"无法停止任务进程树（taskkill: {result.returncode}）")
+    else:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL if force else signal.SIGTERM)
+        except ProcessLookupError:
+            pass
 
 
 class PipelineStopped(Exception):
@@ -135,10 +174,7 @@ class Task:
             self.set_status("stopping", detail="正在停止进程，请稍候")
             proc = run.get("proc")
             if proc and proc.poll() is None:
-                try:
-                    os.killpg(proc.pid, signal.SIGTERM)
-                except ProcessLookupError:
-                    pass
+                terminate_process_tree(proc)
 
     def get_log(self) -> str:
         if not os.path.exists(self.log_file):
@@ -151,11 +187,7 @@ class Task:
         return len(glob_module.glob(os.path.join(self.input_dir, "*.jsonl")))
 
     def count_input_rows(self) -> int:
-        total = 0
-        for f in glob_module.glob(os.path.join(self.input_dir, "*.jsonl")):
-            with open(f, encoding="utf-8", errors="replace") as fh:
-                total += sum(1 for _ in fh)
-        return total
+        return count_jsonl_rows(Path(self.input_dir).glob("*.jsonl"))
 
     def count_split_files(self) -> int:
         result_dir = os.path.join(self.split_dir, "result")
@@ -222,10 +254,7 @@ def run_script(cmd: list, log_file: str, env: dict = None, timeout: int = None) 
                 except subprocess.TimeoutExpired:
                     cancelled = RUNS.get(task_id, {}).get("cancel")
                     if (cancelled and cancelled.is_set()) or (timeout and time.monotonic() - started > timeout):
-                        try:
-                            os.killpg(proc.pid, signal.SIGKILL)
-                        except ProcessLookupError:
-                            pass
+                        terminate_process_tree(proc, force=True)
                         proc.wait()
         finally:
             with RUN_LOCK:

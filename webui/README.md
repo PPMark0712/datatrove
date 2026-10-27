@@ -13,7 +13,16 @@ WEBUI_AUTH="1:1" python webui/app.py
 
 访问 <http://localhost:7860>。`WEBUI_AUTH` 使用 `用户名:密码` 格式，多个账号以逗号分隔；未设置时使用 `admin:datatrove2024`。认证由 Gradio 服务端执行。默认仅监听本机；需要远程访问时设置 `WEBUI_HOST`。端口可由 `WEBUI_PORT` 指定。关闭认证仅适用于本机测试。
 
-数据清洗还依赖 datatrove 的语言识别模型、分词器和过滤器依赖；首次运行可能下载模型。FCD 所需词典已包含在仓库中，NLTK 语料使用上述命令安装。可用 `NLTK_DATA` 指向已有语料目录。
+数据清洗还依赖 datatrove 的语言识别模型、分词器和过滤器依赖；首次运行可能下载模型。FCD 还需要 [词典资源](../src/datatrove/pipeline/fcd/build_dict/README.md)，这些文件未纳入 Git；NLTK 语料使用上述命令安装。可用 `NLTK_DATA` 指向已有语料目录。
+
+Windows 本地验证环境可在仓库根目录执行 `conda env create -f environment-webui.yml`，然后 `conda activate datatrove`。PowerShell 启动命令为：
+
+```powershell
+$env:WEBUI_AUTH="1:1"
+python webui/app.py
+```
+
+此环境包含 WebUI、常用处理依赖和回归测试工具；不包含 CUDA / LTP、KenLM 困惑度模型或 FCD 词典。Windows 上的完整语言过滤还需要安装 Microsoft C++ Build Tools 后执行 `python -m pip install fasttext-numpy2-wheel`；普通 `fasttext-wheel` 不能替代仓库要求的 NumPy 2 兼容包。运行针对性回归测试：`python -m pytest tests/test_webui.py -q`。
 
 ## 操作流程
 
@@ -27,10 +36,12 @@ WEBUI_AUTH="1:1" python webui/app.py
 
 - “开始处理 / 重新运行”使用当前表单配置，重新计算并清理该任务旧的中间缓存和输出。
 - “继续运行”适用于失败或停止的任务，使用上次保存的配置与已完成阶段缓存；表单修改不会改变续跑配置。
+- 继续运行成功提交后，当前任务的表单恢复上次运行配置，并清除其会话草稿；其他任务的草稿保留。提交失败时不清除草稿。
 - 配置草稿按任务保留在当前会话中；切换任务、刷新状态和重命名不会覆盖草稿。刷新整个网页后恢复上次运行的配置。
 - 未启用步骤的参数不可编辑，配置区会提前提示语言和步骤冲突。任务运行时配置锁定，完成或停止后恢复。
 - 结果页对待运行、运行中、停止和失败分别显示说明；只有完成任务才显示统计，零输出时隐藏空预览并禁用保存。纯清洗任务不显示分数分布。
 - “停止”终止任务的实际子进程，完成退出后状态变为“已停止”。服务重启后遗留的运行状态会标记为停止。
+- Windows 上停止操作会终止任务的整个子进程树；结果统计在当前服务进程内缓存，文件新增、删除、大小或修改时间变化后自动重算。首次查看仍需要读取相关文件。
 - 删除任务需要二次确认，原始数据集不会被删除。
 - 添加数据集弹窗支持 Escape 关闭和键盘焦点循环；弹窗打开时底层页面不可操作，关闭后焦点返回添加按钮。
 

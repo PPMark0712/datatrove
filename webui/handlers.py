@@ -5,7 +5,7 @@ from pathlib import Path
 
 import gradio as gr
 
-from task_manager import Task, list_tasks, list_workspace_datasets, load_scores, plot_score_distribution
+from task_manager import Task, list_tasks, list_workspace_datasets, load_scores, plot_score_distribution, count_jsonl_rows
 
 
 STATUS_NAMES = {
@@ -36,11 +36,7 @@ def next_dataset_name():
 
 
 def row_count(paths):
-    total = 0
-    for path in paths:
-        with Path(path).open(encoding="utf-8") as source:
-            total += sum(bool(line.strip()) for line in source)
-    return total
+    return count_jsonl_rows(paths)
 
 
 def status_html(task):
@@ -112,7 +108,7 @@ def config_controls(values, busy=False):
     clean, _, fcd, _, _, _, gc, _, _, _, _, _, sample, *_ = values
     enabled = [
         True, clean, True, fcd, fcd, fcd, True, gc, gc, gc, gc, gc,
-        fcd, sample and fcd, sample and fcd, False, True,
+        fcd or sample, sample and fcd, sample and fcd, False, True,
     ]
     return [gr.update(interactive=bool(flag) and not busy) for flag in enabled]
 
