@@ -77,6 +77,9 @@ finish()
     assert workflow["on"]["push"]["tags"] == ["v*"]
     assert "workflow_call" in workflow["on"]
     assert workflow["concurrency"]["cancel-in-progress"] == "false"
+    # The runner context is unavailable in jobs.<job_id>.env. GitHub rejects
+    # the entire workflow before running jobs if runner.temp appears here.
+    assert "runner." not in json.dumps(workflow["jobs"]["attach-data"]["env"])
     result = None
     for step in workflow["jobs"]["attach-data"]["steps"]:
         if "run" not in step:

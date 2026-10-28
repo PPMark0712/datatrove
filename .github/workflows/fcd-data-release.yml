@@ -41,7 +41,6 @@ jobs:
       GH_REPO: ${{ github.repository }}
       TARGET_TAG: ${{ inputs.tag || github.event.release.tag_name || github.ref_name }}
       SOURCE_TAG: ${{ inputs.source_tag || vars.FCD_DATA_SOURCE_TAG || 'fcd-data' }}
-      RESOURCE_PATH: ${{ runner.temp }}/fcd-data/fcd_data.zip
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -51,6 +50,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          export RESOURCE_PATH="$RUNNER_TEMP/fcd-data/fcd_data.zip"
+          printf 'RESOURCE_PATH=%s\n' "$RESOURCE_PATH" >> "$GITHUB_ENV"
           if [[ "$TARGET_TAG" == "$SOURCE_TAG" ]]; then
             echo "Source and target must be different Releases."
             exit 1

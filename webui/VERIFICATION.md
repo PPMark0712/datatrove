@@ -130,3 +130,10 @@
 - 四项 GitHub CLI 本地模拟场景通过：新 Release 先上传再发布、已存在 Release 补挂附件、同名附件不覆盖、源附件缺失时安全失败。连同资源包测试共 8 项通过；未执行真实远端发布。
 - 根 README 和资源 README 均提供 PPMark0712/datatrove 最新 Release 的 Bash 与 PowerShell 下载/校验/解压命令。两段命令已在本机隔离 HTTP 服务上实际执行，四个解压文件内容均一致；这不代表尚未上传的远端资源附件已存在。
 - GitHub 只读查询确认当前无 Release。首次仍需上传 fcd-data 资源源 ZIP，再推送版本 tag 或通过发布 workflow 创建带附件的版本 Release。
+
+## 2026-10-28 Release workflow 解析错误修复
+
+- 远端失败记录：Actions run 40622521483，GitHub 在解析第 44 行时拒绝 job 级 env 中的 runner.temp。发布 job 没有启动。
+- 将 RESOURCE_PATH 改为下载步骤内使用 RUNNER_TEMP 设置，并通过 GITHUB_ENV 传给后续步骤；新增回归约束。
+- 官方 actionlint 1.7.12 复现原错误；修复后全部 workflow 均通过上下文/语法校验，8 项发布与打包回归通过。
+- 同时将旧 checkout@v3 / setup-python@v4 升级到 v4 / v5，并在 testing workflow 加入独立 actionlint 检查。
