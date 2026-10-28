@@ -35,7 +35,7 @@ concept_difficulty = log(distance + 1) / log(max_distance + 1)
 
 ## 数据文件
 
-FCD 计算依赖三个数据文件，位于 `pipeline/fcd/build_dict/data/`（未纳入 git）：
+FCD 计算依赖三个数据文件，位于 `pipeline/fcd/build_dict/data/`。较小的基础词表、距离表与构建清单可纳入 Git；原始 CSV 和大型词频表保留在本地。
 
 | 文件 | 说明 |
 |------|------|
@@ -78,7 +78,8 @@ python scripts/calc_score/calc_fcd.py \
 pipeline/fcd/
 ├── fcd_calculator.py       # 核心计算器
 └── build_dict/
-    ├── data/               # 运行时数据（gitignore）
+    ├── data/               # 词典和构建清单；大型输入文件 gitignore
+    ├── prepare_local.py    # 从本地 CSV 和词频表复现资源
     ├── get_basic_words.py  # 提取 Oxford 5000 基础词
     ├── calc_word_freq.py   # 计算词频表
     ├── calc_dis_to_basic.py # 计算 WordNet 距离

@@ -70,7 +70,7 @@ class JsonlReader(BaseDiskReader):
         import orjson
         from orjson import JSONDecodeError
 
-        with self.data_folder.open(filepath, "r", compression=self.compression) as f:
+        with self.data_folder.open(filepath, "r", compression=self.compression, encoding="utf-8") as f:
             try:
                 for li, line in enumerate(f):
                     with self.track_time():

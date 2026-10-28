@@ -1,0 +1,3 @@
+build_dict/data/basic_words.txt text eol=lf
+build_dict/data/dis_to_basic.txt text eol=lf
+build_dict/data/manifest.json text eol=lf

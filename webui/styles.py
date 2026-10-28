@@ -69,7 +69,7 @@ footer { display: none !important; }
 }
 #main-panel h2 { margin: 0 0 8px; font-size: 23px; letter-spacing: -.4px; }
 .name-actions { align-items: end !important; }
-.name-actions > button { flex-grow: 0 !important; min-width: 88px !important; margin-bottom: 1px; }
+.name-actions > button { flex-grow: 0 !important; min-width: 104px !important; margin-bottom: 1px; white-space: nowrap; }
 .config-feedback { border-left: 3px solid #a5b4fc; padding: 6px 12px !important; background: #eef2ff; }
 .config-feedback p { color: #475569; font-size: 13px; margin: 0 !important; }
 .task-tabs > .tab-nav { background: var(--background-fill-primary, #fff); }

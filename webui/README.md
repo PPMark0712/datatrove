@@ -13,7 +13,7 @@ WEBUI_AUTH="1:1" python webui/app.py
 
 访问 <http://localhost:7860>。`WEBUI_AUTH` 使用 `用户名:密码` 格式，多个账号以逗号分隔；未设置时使用 `admin:datatrove2024`。认证由 Gradio 服务端执行。默认仅监听本机；需要远程访问时设置 `WEBUI_HOST`。端口可由 `WEBUI_PORT` 指定。关闭认证仅适用于本机测试。
 
-数据清洗还依赖 datatrove 的语言识别模型、分词器和过滤器依赖；首次运行可能下载模型。FCD 还需要 [词典资源](../src/datatrove/pipeline/fcd/build_dict/README.md)，这些文件未纳入 Git；NLTK 语料使用上述命令安装。可用 `NLTK_DATA` 指向已有语料目录。
+数据清洗还依赖 datatrove 的语言识别模型、分词器和过滤器依赖；首次运行可能下载模型。FCD 还需要 [词典资源](../src/datatrove/pipeline/fcd/build_dict/README.md)，可从本地 CEFR CSV 与词频表复现；大型输入文件未纳入 Git。NLTK 语料使用上述命令安装。可用 `NLTK_DATA` 指向已有语料目录。
 
 Windows 本地验证环境可在仓库根目录执行 `conda env create -f environment-webui.yml`，然后 `conda activate datatrove`。PowerShell 启动命令为：
 
@@ -22,7 +22,9 @@ $env:WEBUI_AUTH="1:1"
 python webui/app.py
 ```
 
-此环境包含 WebUI、常用处理依赖和回归测试工具；不包含 CUDA / LTP、KenLM 困惑度模型或 FCD 词典。Windows 上的完整语言过滤还需要安装 Microsoft C++ Build Tools 后执行 `python -m pip install fasttext-numpy2-wheel`；普通 `fasttext-wheel` 不能替代仓库要求的 NumPy 2 兼容包。运行针对性回归测试：`python -m pytest tests/test_webui.py -q`。
+此环境包含 WebUI、常用处理依赖和回归测试工具；CUDA / LTP、KenLM 困惑度模型需另行配置。Windows 上安装 Microsoft C++ Build Tools 后，在仓库根目录运行 `./scripts/setup_fasttext_windows.ps1` 构建语言过滤依赖；默认工具链目录为 `C:\BuildTools`，可用 `-ToolchainSetup` 指定其他路径。该脚本设置 C++17、兼容的 pybind11 与 Windows 类型别名；普通 `fasttext-wheel` 不能替代 NumPy 2 兼容包。运行针对性回归测试：`python -m pytest tests/test_webui.py tests/pipeline/test_fcd_resources.py -q`。
+
+实际 FCD / Hard 50% / 统计与导出验收可运行 `python webui/verify_fcd.py`；结果写入隔离缓存目录，不覆盖现有演示任务。
 
 ## 操作流程
 

@@ -98,3 +98,21 @@
 - 使用生成的 200,000 条、22,600,000 字节 JSONL 检查统计缓存：首次约 0.1214 秒，再次约 0.0005 秒。此数据仅反映本机单文件统计，不作为完整流水线吞吐指标；首次查看仍需扫描数据。
 - Windows 沙箱限制 `taskkill`，真实停止测试在正常进程权限下运行；隔离测试与浏览器检查未改写现有演示任务。截图保存在本地忽略目录 `webui/.cache/frontend-verification.png`。
 - 本次未运行完整清洗 / FCD / GPU 链路：本机缺少用于编译 `fasttext-numpy2-wheel` 的 Microsoft C++ Build Tools，仓库缺少 FCD 词典，未配置 CUDA / LTP。普通 `fasttext-wheel` 不能满足仓库的 NumPy 2 兼容依赖检查。
+
+## 2026-10-27 本地词典与真实 FCD 验收
+
+- 从用户提供的 `oxford_5000.csv`（1,138,758 字节）与 `word_freq.txt`（218,077,324 字节）构建。原文件保持不变，副本位于 `src/datatrove/pipeline/fcd/build_dict/data/`。来源哈希、生成哈希与 NLTK/WordNet 版本记录于该目录的 `manifest.json`。
+- 本地入口 `prepare_local.py` 不下载 Google Ngram；生成 1,679 个 A1/A2 基础词，4,876 个基础名词义项对应 82,115 个名词距离。词频表逐行验证通过（15,493,823 行），所有基础词均有词频。小型输出与 manifest 可进 Git，CSV 和大型词频表忽略。
+- 修复 Windows 默认 GBK 导致 UTF-8 词典/JSONL 解码失败、跳过数据的问题；分隔符读取兼容空格和 Tab。任务日志统一 UTF-8，关闭捕获日志中的 ANSI 颜色码。分数和输入数量不一致时提供明确错误。
+- `tests/test_webui.py` 和 `tests/pipeline/test_fcd_resources.py` 共 8 项回归通过，覆盖复现构建、缺失词频、UTF-8/分隔符、JSONL 中文读取和原有 WebUI 状态/停止回归。
+- `python webui/verify_fcd.py` 使用仓库 `test_data/test.jsonl` 的全部 20 条记录，关闭清洗，单进程真实运行两次 FCD，第二次启用 Hard 50%。两次分数逐条相同；输入/打分数均为 20，采样输出为 10，等于稳定排序后的最高分半数并保持原顺序。
+- 全部 20 个分数均有限且在 [0,1]；均值 0.2091910733775681，标准差 0.20324199079235716，中位数 0.24329859603515633。样本包含非英文和噪声；本验证不是清洗或文本质量评估的证据。
+- 核对 UI 处理统计、所有预览详情元数据、ZIP 内容和 100 桶 PDF/CDF；密度积分为 1，CDF 与同组桶计数一致。浏览器实际显示 20 → 10，预览加载 10 行、正文和分数一致，分布图明确统计采样前 n=20；实际下载的 ZIP 与最终输出逐条相同。
+- 报告和截图位于本地 `webui/.cache/fcd-acceptance/`。任务使用隔离目录，现有演示任务不改写，也不会自动套用新词典重新计算。
+- C++ 工具链与 `fasttext-numpy2-wheel 0.9.2` 已安装；仓库 LanguageFilter 依赖检查通过。Windows 复现脚本为 `scripts/setup_fasttext_windows.ps1`，使用 C++17、pybind11 2.x 和 ssize_t 类型兼容头。本轮没有运行完整语言过滤或 CUDA 链路。
+
+## 2026-10-28 中断后最终复验
+
+- 8 项回归再次全部通过，pip check 无依赖冲突；清单中的所有资源和脚本 SHA-256 均匹配。
+- 浏览器重启后复验，结果表仍显示输入 20、FCD 打分后 20、最终输出 10；任务按钮的最小宽度及不换行样式修复已生效。
+- 最终页面截图：`webui/.cache/fcd-acceptance/frontend-final.png`；分布图截图：`frontend-distribution.png`。

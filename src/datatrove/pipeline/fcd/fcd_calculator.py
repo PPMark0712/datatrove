@@ -87,7 +87,7 @@ class FcdCalculator(PipelineStep):
 
         logger.info("loading dis_to_basic")
         self.dis_to_basic = {}
-        with open(self.dis_to_basic_path, "r") as f:
+        with open(self.dis_to_basic_path, "r", encoding="utf-8") as f:
             for line in f:
                 synset_name, dis = line.strip().split(" ")
                 self.dis_to_basic[synset_name] = int(dis)
@@ -96,14 +96,14 @@ class FcdCalculator(PipelineStep):
 
         logger.info("loading word_freq")
         self.word_log_freq = {}
-        with open(self.word_freq_path, "r") as f:
+        with open(self.word_freq_path, "r", encoding="utf-8") as f:
             for line in f:
-                word, freq = line.strip().split(" ")
+                word, freq = line.split()
                 self.word_log_freq[word] = math.log(int(freq))
 
         logger.info("calculating log_freq center")
         if self.log_freq_center is None:
-            with open(self.basic_words_path, "r") as f:
+            with open(self.basic_words_path, "r", encoding="utf-8") as f:
                 basic_words = [line.strip() for line in f.readlines()]
             basic_log_freqs = sorted(self.word_log_freq[word] for word in basic_words)
             self.log_freq_center = basic_log_freqs[int(len(basic_log_freqs) * self.log_freq_quantile)]

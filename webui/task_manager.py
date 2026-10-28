@@ -230,6 +230,9 @@ def run_script(cmd: list, log_file: str, env: dict = None, timeout: int = None) 
     check_stopped(task_id)
     cmd = [sys.executable if part == "python" and i == 0 else part for i, part in enumerate(cmd)]
     full_env = os.environ.copy()
+    # Captured logs are read as UTF-8 by the UI, including on Chinese Windows.
+    full_env["PYTHONIOENCODING"] = "utf-8"
+    full_env["DATATROVE_COLORIZE_LOGS"] = "false"
     full_env.setdefault("NLTK_DATA", os.path.join(WEBUI_DIR, ".cache", "nltk_data"))
     if env:
         full_env.update(env)
@@ -370,6 +373,8 @@ def step_calc_fcd(task: Task, config: dict, input_dir: str, workers: int = 8):
                 if not line.strip():
                     continue
                 doc = json.loads(line)
+                if index >= len(scores):
+                    raise ValueError(f"FCD 分数数量与输入不一致：{source.name}，无法生成结果")
                 doc.setdefault("metadata", {})["fcd_score"] = scores[index]
                 dest.write(json.dumps(doc, ensure_ascii=False) + "\n")
                 index += 1

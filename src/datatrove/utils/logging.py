@@ -52,7 +52,7 @@ def add_task_logger(
 
     """
     logger.remove()
-    logfile = logging_dir.open(f"logs/task_{rank:05d}.log", "w")
+    logfile = logging_dir.open(f"logs/task_{rank:05d}.log", "w", encoding="utf-8")
     logger.add(sys.stderr, colorize=DATATROVE_COLORIZE_LOGS, level="INFO" if local_rank == 0 else "ERROR")
     logger.add(logfile, colorize=DATATROVE_COLORIZE_LOG_FILES, level="DEBUG")
     logger.info(f"Launching pipeline for {rank=}")

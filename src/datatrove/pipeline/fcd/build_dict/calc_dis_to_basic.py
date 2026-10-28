@@ -12,7 +12,7 @@ def get_basic_synsets(basic_words):
         synsets = wn.synsets(word, pos="n")
         if synsets:
             basic_synsets.extend(synsets)
-    basic_synsets = list(set(basic_synsets))
+    basic_synsets = sorted(set(basic_synsets), key=lambda synset: synset.name())
     print(f"get {len(basic_synsets)} basic synsets")
     return basic_synsets
 
