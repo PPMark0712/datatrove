@@ -13,7 +13,7 @@ WEBUI_AUTH="1:1" python webui/app.py
 
 访问 <http://localhost:7860>。`WEBUI_AUTH` 使用 `用户名:密码` 格式，多个账号以逗号分隔；未设置时使用 `admin:datatrove2024`。认证由 Gradio 服务端执行。默认仅监听本机；需要远程访问时设置 `WEBUI_HOST`。端口可由 `WEBUI_PORT` 指定。关闭认证仅适用于本机测试。
 
-数据清洗还依赖 datatrove 的语言识别模型、分词器和过滤器依赖；首次运行可能下载模型。FCD 还需要 [词典资源](../src/datatrove/pipeline/fcd/build_dict/README.md)，可从本地 CEFR CSV 与词频表复现；大型输入文件未纳入 Git。NLTK 语料使用上述命令安装。可用 `NLTK_DATA` 指向已有语料目录。
+数据清洗还依赖 datatrove 的语言识别模型、分词器和过滤器依赖；首次运行可能下载模型。FCD 的 [词典资源](../src/datatrove/pipeline/fcd/build_dict/README.md)可直接从版本 Release 下载 `fcd_data.zip` 并解压到 `src/datatrove/pipeline/fcd/build_dict/`；整个 data 目录不纳入 Git，普通用户无需本地构建。NLTK 语料使用上述命令安装。可用 `NLTK_DATA` 指向已有语料目录。
 
 Windows 本地验证环境可在仓库根目录执行 `conda env create -f environment-webui.yml`，然后 `conda activate datatrove`。PowerShell 启动命令为：
 

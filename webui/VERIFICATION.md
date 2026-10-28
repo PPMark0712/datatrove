@@ -116,3 +116,10 @@
 - 8 项回归再次全部通过，pip check 无依赖冲突；清单中的所有资源和脚本 SHA-256 均匹配。
 - 浏览器重启后复验，结果表仍显示输入 20、FCD 打分后 20、最终输出 10；任务按钮的最小宽度及不换行样式修复已生效。
 - 最终页面截图：`webui/.cache/fcd-acceptance/frontend-final.png`；分布图截图：`frontend-distribution.png`。
+
+## 2026-10-28 FCD Release 资源包
+
+- 按要求移除 manifest 文件及其生成逻辑；整个 `build_dict/data/` 改为 Git 忽略。基础词表和距离表只移除 Git 跟踪，本地文件保留；未改写已有 Git 历史。
+- `package_data.py` 生成本地 `dist/fcd_data.zip`，90,874,765 字节。包含 `data/basic_words.txt`、`data/dis_to_basic.txt`、`data/word_freq.txt`、`data/oxford_5000.csv`；CRC 和逐文件字节哈希比对全部通过，不含 manifest。dist 已被 Git 忽略。
+- 新增 `.github/workflows/fcd-data-release.yml`：首次资源 ZIP 需要维护者上传到资源 Release（默认 tag 为 fcd-data）；后续发布 GitHub Release 或手动运行 workflow 时，从该资源 Release 下载、验证并附加同一个 ZIP。目标已有同名附件时保留，不覆盖。现有 PyPI workflow 不创建 GitHub Release，因此不会仅凭 tag 自动触发。
+- 12 项本地回归全部通过，workflow YAML/事件结构静态检查通过。此次未上传 GitHub 附件，未在远端执行 workflow；需先将代码合并到默认分支并上传首次资源附件。

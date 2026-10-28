@@ -37,7 +37,7 @@ def test_local_dictionary_build_is_reproducible(tmp_path):
     assert first["basic_words"] == 2
     assert first["noun_synsets"] > 0
     assert first == prepare(target / "oxford_5000.csv", target / "word_freq.txt", target)
-    assert json.loads((target / "manifest.json").read_text(encoding="utf-8")) == first
+    assert not (target / "manifest.json").exists()
 
 
 def test_missing_basic_word_frequency_is_rejected(tmp_path):

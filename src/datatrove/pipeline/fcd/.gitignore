@@ -1,4 +1,1 @@
-build_dict/data/*
-!build_dict/data/basic_words.txt
-!build_dict/data/dis_to_basic.txt
-!build_dict/data/manifest.json
+build_dict/data/

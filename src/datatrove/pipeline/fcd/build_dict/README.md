@@ -1,55 +1,90 @@
-# FCD 本地资源与可复现构建
+# FCD 数据与 Release 资源包
 
-默认资源目录为本文件旁的 `data/`。
+FCD 默认读取本目录下的 `data/`。当前资源符合加载要求：UTF-8，词频支持空格或 Tab 分隔，三个运行词典均通过实际打分验收。
 
-| 文件 | 来源 / 用途 | 当前数量 |
+| 文件 | 用途 | 当前数量 |
 |---|---|---:|
-| `oxford_5000.csv` | 用户提供的 Oxford 5000 / CEFR 原始 CSV | 原样复制 |
-| `word_freq.txt` | 用户提供的词频表；不重新抓取 Google Ngram | 15,493,823 行 |
-| `basic_words.txt` | CSV 中 CEFR 为 a1/a2、纯字母词，小写后去重排序 | 1,679 词 |
-| `dis_to_basic.txt` | WordNet 3.0 名词图到基础词名词义项的最短距离 | 82,115 义项 |
-| `manifest.json` | 输入、输出、脚本的 SHA-256，资源大小及 NLTK/WordNet 版本 | 构建清单 |
+| `basic_words.txt` | CEFR A1/A2、纯字母词，小写去重排序 | 1,679 词 |
+| `dis_to_basic.txt` | WordNet 3.0 名词图到基础词义项的最短距离 | 82,115 义项 |
+| `word_freq.txt` | 用户提供的词频表 | 15,493,823 行 |
+| `oxford_5000.csv` | 重建基础词表所用的原始 CSV；运行时不读取 | 1,138,758 字节 |
 
-CEFR 构建逻辑沿用 `get_basic_words.py`。它原先的下载源是第三方仓库
-`winterdl/oxford-5000-vocabulary-audio-definition` 的 `data/oxford_5000.csv`。
-本地流程只使用传入文件，不验证该 CSV 是否与在线最新版本一致；词频表的上游版本也不从内容推断，按清单中的 SHA-256 标识本次输入。
+整个 data 目录、打包后的 ZIP 均不进入 Git。没有 manifest 文件，也不会在构建时生成 manifest。
+NLTK 运行语料仍需单独安装，资源 ZIP 不包含 NLTK、CUDA 或 Python 依赖。
 
-## 使用本地输入复现
+## 用户：下载即可使用
 
-在仓库根目录、激活 datatrove 环境后执行：
+从本仓库对应版本的 GitHub Release 的 Assets 区域下载 **`fcd_data.zip`**。
+不要下载 GitHub 自动生成的 Source code ZIP，因为 Git 源码不包含 data。
+在仓库根目录执行：
+
+```powershell
+python src/datatrove/pipeline/fcd/build_dict/package_data.py --validate fcd_data.zip
+python -m zipfile -e fcd_data.zip src/datatrove/pipeline/fcd/build_dict
+```
+
+ZIP 内有 `data/` 这一层目录，解压后四个文件直接位于正确位置，无需重建词典。
+也可用 GitHub CLI 下载指定版本的附件：
+
+```powershell
+gh release download VERSION_TAG --repo OWNER/REPO --pattern fcd_data.zip
+```
+
+## 维护者：打包与首次上传
+
+已有本地 data 时，在仓库根目录执行：
+
+```powershell
+python src/datatrove/pipeline/fcd/build_dict/package_data.py
+```
+
+生成 `dist/fcd_data.zip`，只包含上述四个文件。打包过程流式压缩、检查文件缺失/空文件和 ZIP CRC；不会载入完整词频字典，也不会生成 manifest。
+
+CI 无法访问本地忽略的 data，所以需要**一次性上传**本地生成的 ZIP。可以在 GitHub 页面创建一个名为 `fcd-data` 的资源 Release，并将 ZIP 拖入 Assets；或者在已登录 GitHub CLI 后执行：
+
+```powershell
+gh release create fcd-data dist/fcd_data.zip --repo OWNER/REPO --title "FCD data" --notes "Prebuilt FCD dictionaries" --latest=false
+```
+
+这一步由维护者明确执行；仅添加 workflow 不会把电脑上的文件自动上传。
+若资源 Release 已存在，可使用 `gh release upload fcd-data dist/fcd_data.zip --repo OWNER/REPO` 上传附件。
+
+## 维护者：每个版本自动附加资源
+
+`.github/workflows/fcd-data-release.yml` 会在 GitHub Release **published** 后：
+
+1. 从本仓库的 `fcd-data` Release 下载现有 `fcd_data.zip`；不运行词典构建。
+2. 校验 ZIP 结构、四个文件和 CRC。
+3. 将原样 ZIP 上传到当前版本 Release。目标已存在同名附件时保留它，不覆盖已发布资源。
+
+资源源 Release 可通过仓库 Actions 变量 `FCD_DATA_SOURCE_TAG` 指定其他标签。也可在 Actions 中手动运行此 workflow，填写已存在的目标 Release tag 和资源源 tag。
+首次发布 `fcd-data` 资源 Release 时，该 workflow 会跳过自身。
+
+将 workflow 和打包校验脚本合并到默认分支后再发布新版本。现有 `pypi-release.yml` 只创建 tag 并上传 PyPI，不创建 GitHub Release；仅推送 tag 或发布 PyPI 都不会触发这里的 published 事件。需要另行在 GitHub 发布 Release，或手动运行此 workflow。
+若启用了不可变 Release，应先创建草稿，在 Actions 手动运行此 workflow 给草稿添加资源，再发布草稿。不能依赖发布后追加附件；已包含附件的 published 事件会跳过上传。
+
+## 可选：维护者从本地原始输入重建
+
+普通用户不需要这一步。维护者需要更新词典时，可执行：
 
 ```powershell
 python src/datatrove/pipeline/fcd/build_dict/prepare_local.py --cefr-csv "C:/Users/mark/Downloads/oxford_5000.csv" --word-freq "C:/Users/mark/Desktop/word_freq.txt" --nltk-data webui/.cache/nltk_data
 ```
 
-重新构建时也可将两个输入参数指向 `data/oxford_5000.csv`、`data/word_freq.txt`。
-脚本不会修改源文件；先复制到 data，再逐行校验词频为正整数、所有基础词都有对应词频。
-WordNet 必须事先安装到本地，缺少语料时直接失败，不隐式下载。
-本次使用 NLTK 3.10.4、WordNet 3.0；使用相同输入、脚本及语料版本可复现清单中的输出哈希。
-生成文本统一为 UTF-8 / LF。
+脚本复制原始输入、校验正整数词频和基础词覆盖，生成两个派生词典，只在控制台打印数量与版本。
+本次使用 NLTK 3.10.4、WordNet 3.0。基础词来自 `get_basic_words.py` 沿用的 A1/A2 筛选逻辑；其原始在线来源为第三方仓库 `winterdl/oxford-5000-vocabulary-audio-definition` 的 `data/oxford_5000.csv`。
+距离沿四类上下位关系做多源 BFS；起点距离为 0，不可达哨兵为 100，结果稳定排序且使用 UTF-8 / LF。
 
-距离计算沿用仓库算法：将基础词的所有名词义项作为起点，沿 hypernyms、instance_hypernyms、hyponyms、instance_hyponyms 做多源 BFS；起点距离为 0，不可达节点保留哨兵值 100。起点和最终输出均稳定排序。
+历史 `build_dict.sh` / Google Ngram 下载脚本保留供参考，其中相对目录和固定 24 进程需要另行修正/评估；本地输入重建无需下载 Ngram。
 
-大型 CSV 和词频表保留本地并被 Git 忽略；基础词表、距离表与 manifest 可纳入版本控制。
-`.gitignore` 也会忽略 data 中其他大型原始资源。
-
-## 运行 FCD 验收
+## 验收与资源开销
 
 ```powershell
 python webui/verify_fcd.py
-python -m pytest tests/test_webui.py tests/pipeline/test_fcd_resources.py -q
+python -m pytest tests/test_webui.py tests/pipeline/test_fcd_resources.py tests/pipeline/test_fcd_release.py -q
 ```
 
-验收脚本默认使用 `webui/test_data/test.jsonl` 的全部 20 条记录，禁用清洗，以单进程运行真实 FCD，再运行 FCD + Hard 50% 采样。
-检查分数和记录对齐、两次打分一致、Top 半数和原顺序、UI 统计/预览元数据、ZIP 完整性、100 桶 PDF/CDF 数值。
-任务、报告和图片保存在 `webui/.cache/fcd-acceptance/`，不覆盖现有演示任务。
-该样本含非英文与噪声记录；本验收不代表语言过滤或文本质量评估通过，FCD 分数高也不等于文本质量高。
-
-218 MB 词频表包含约 1,549 万词条，FCD 会将其载入 Python 字典，每个工作进程各持一份。
-本机 16 GB 内存验证时使用 `workers=1`；不要直接套用旧文档的 32 进程示例。
-
-## 历史全量构建脚本
-
-`build_dict.sh` 串联下载 Oxford CSV、下载 Google Ngram 24 个分片、统计词频、计算距离。
-这些脚本保留供参考；其中 `calc_word_freq.py` 的相对目录/输出目录与下载脚本不一致，固定 24 进程也需要先评估资源。
-本次可复现入口是 `prepare_local.py`，无需执行历史下载流程。
+真实验收使用测试数据全部 20 条记录、禁用清洗，单进程 FCD 后再 Hard 50% 采样，得到 10 条输出。
+检查分数对齐与重复运行一致性、UI 统计/预览元数据、ZIP 内容、100 桶 PDF/CDF。
+样本包含非英文和噪声，FCD 高分不等于质量高。
+词频表约 218 MB、1,549 万词条；每个 FCD 进程会各自加载整张表，本机 16 GB 内存验证采用 workers=1。

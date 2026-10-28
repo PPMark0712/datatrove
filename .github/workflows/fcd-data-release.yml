@@ -1,0 +1,59 @@
+name: Attach FCD data to Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing target Release tag
+        required: true
+        type: string
+      source_tag:
+        description: Release containing the original fcd_data.zip
+        required: true
+        default: fcd-data
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  attach-data:
+    if: github.event_name == 'workflow_dispatch' || github.event.release.tag_name != (vars.FCD_DATA_SOURCE_TAG || 'fcd-data')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TARGET_TAG: ${{ inputs.tag || github.event.release.tag_name }}
+      SOURCE_TAG: ${{ inputs.source_tag || vars.FCD_DATA_SOURCE_TAG || 'fcd-data' }}
+      RESOURCE_PATH: ${{ runner.temp }}/fcd-data/fcd_data.zip
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download the existing resource asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$TARGET_TAG" == "$SOURCE_TAG" ]]; then
+            echo "Source and target must be different Releases."
+            exit 1
+          fi
+          gh release view "$TARGET_TAG" --repo "$GH_REPO" > /dev/null
+          mkdir -p "$(dirname "$RESOURCE_PATH")"
+          gh release download "$SOURCE_TAG" --repo "$GH_REPO" --pattern fcd_data.zip --dir "$(dirname "$RESOURCE_PATH")"
+      - name: Validate the resource archive
+        run: python src/datatrove/pipeline/fcd/build_dict/package_data.py --validate "$RESOURCE_PATH"
+      - name: Attach to the target Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Keep published resources unchanged on a rerun.
+          gh release view "$TARGET_TAG" --repo "$GH_REPO" --json assets --jq '.assets[].name' > "$RUNNER_TEMP/asset-names.txt"
+          if grep -Fxq fcd_data.zip "$RUNNER_TEMP/asset-names.txt"; then
+            echo "Target already contains fcd_data.zip; leaving it unchanged."
+          else
+            gh release upload "$TARGET_TAG" "$RESOURCE_PATH" --repo "$GH_REPO"
+          fi

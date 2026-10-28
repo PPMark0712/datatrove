@@ -1,7 +1,6 @@
 """Build FCD resources from local inputs, without downloading Google Ngram."""
 
 import argparse
-import hashlib
 import json
 import shutil
 from pathlib import Path
@@ -11,14 +10,6 @@ from nltk.corpus import wordnet as wn
 
 from get_basic_words import get_basic_words
 from calc_dis_to_basic import get_basic_synsets, calc_dis_to_basic
-
-
-def sha256(path):
-    digest = hashlib.sha256()
-    with Path(path).open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def prepare(cefr_csv, word_freq, output_dir, nltk_data=None):
@@ -51,20 +42,14 @@ def prepare(cefr_csv, word_freq, output_dir, nltk_data=None):
     distances = calc_dis_to_basic(get_basic_synsets(words))
     (output_dir / "dis_to_basic.txt").write_text(
         "".join(f"{name} {distance}\n" for name, distance in distances.items()), encoding="utf-8", newline="\n")
-    manifest = {
+    summary = {
         "cefr_levels": ["a1", "a2"], "nltk_version": nltk.__version__,
         "wordnet_version": wordnet_version, "basic_words": len(words),
         "frequency_rows": frequency_rows, "noun_synsets": len(distances),
         "unreachable_distance": 100,
-        "script_hash_format": "UTF-8 bytes with CRLF normalized to LF",
-        "scripts": {name: hashlib.sha256((Path(__file__).parent / name).read_bytes().replace(b"\r\n", b"\n")).hexdigest()
-                    for name in ("prepare_local.py", "get_basic_words.py", "calc_dis_to_basic.py")},
-        "files": {name: {"sha256": sha256(output_dir / name), "bytes": (output_dir / name).stat().st_size}
-                  for name in ("oxford_5000.csv", "word_freq.txt", "basic_words.txt", "dis_to_basic.txt")},
     }
-    (output_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
-    print(json.dumps(manifest, ensure_ascii=True, indent=2))
-    return manifest
+    print(json.dumps(summary, ensure_ascii=True, indent=2))
+    return summary
 
 
 if __name__ == "__main__":
