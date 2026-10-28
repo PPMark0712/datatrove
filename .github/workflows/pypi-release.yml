@@ -9,6 +9,8 @@ jobs:
   release:
     needs: testing
     runs-on: ubuntu-latest
+    outputs:
+      tag: v${{ steps.get_tag_name.outputs.TAG_NAME }}
     env:
       TWINE_USERNAME: __token__
 
@@ -68,3 +70,12 @@ jobs:
         env:
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
         run: twine upload dist/* --repository=pypi
+
+  fcd-data-release:
+    needs: release
+    permissions:
+      contents: write
+    uses: ./.github/workflows/fcd-data-release.yml
+    with:
+      tag: ${{ needs.release.outputs.tag }}
+      source_tag: ${{ vars.FCD_DATA_SOURCE_TAG || 'fcd-data' }}

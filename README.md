@@ -23,6 +23,37 @@ pip install -e ".[webui,gpu]"
 pip install -e ".[processing]"
 ```
 
+## 下载 FCD 词典（最新版 Release）
+
+在仓库根目录执行以下整段命令，即可下载、校验并解压到 `src/datatrove/pipeline/fcd/build_dict/data/`。需要已安装 Python；Linux 另需 curl。ZIP 约 91 MB，整个 data 与 dist 目录均不进入 Git。
+
+Linux / macOS：
+
+```bash
+mkdir -p dist && \
+curl --fail --location --retry 3 --output dist/fcd_data.zip \
+  https://github.com/PPMark0712/datatrove/releases/latest/download/fcd_data.zip && \
+python3 src/datatrove/pipeline/fcd/build_dict/package_data.py --validate dist/fcd_data.zip && \
+python3 -m zipfile -e dist/fcd_data.zip src/datatrove/pipeline/fcd/build_dict
+```
+
+Windows PowerShell（先激活 datatrove 环境）：
+
+```powershell
+& {
+    $ErrorActionPreference = 'Stop'
+    New-Item -ItemType Directory -Force -Path dist | Out-Null
+    Invoke-WebRequest -Uri 'https://github.com/PPMark0712/datatrove/releases/latest/download/fcd_data.zip' -OutFile dist/fcd_data.zip
+    python src/datatrove/pipeline/fcd/build_dict/package_data.py --validate dist/fcd_data.zip
+    if ($LASTEXITCODE -ne 0) { throw 'FCD ZIP 校验失败，未解压' }
+    Expand-Archive -LiteralPath dist/fcd_data.zip -DestinationPath src/datatrove/pipeline/fcd/build_dict -Force
+}
+```
+
+这些命令使用 GitHub 标记为 Latest 的版本 Release，更新本地词典，不需要本地构建。首次使用前维护者必须上传资源源 ZIP 并发布一个带附件的版本 Release；如果下载返回 404，请检查 [Releases](https://github.com/PPMark0712/datatrove/releases)。NLTK 语料仍需单独安装。
+
+维护者的一次性资源上传及自动发布流程见 [FCD 资源说明](src/datatrove/pipeline/fcd/build_dict/README.md)。
+
 ## 扩展功能
 
 | 模块 | 说明 | 文档 |
@@ -42,7 +73,7 @@ pip install -e ".[processing]"
 python scripts/calc_score/calc_fcd.py \
     --input_path /path/to/jsonl_folder \
     --output_path /path/to/output \
-    --tasks 32 --workers 32
+    --tasks 1 --workers 1
 ```
 
 ### CDF-GC 筛选（完整流水线）

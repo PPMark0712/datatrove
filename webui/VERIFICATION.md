@@ -123,3 +123,10 @@
 - `package_data.py` 生成本地 `dist/fcd_data.zip`，90,874,765 字节。包含 `data/basic_words.txt`、`data/dis_to_basic.txt`、`data/word_freq.txt`、`data/oxford_5000.csv`；CRC 和逐文件字节哈希比对全部通过，不含 manifest。dist 已被 Git 忽略。
 - 新增 `.github/workflows/fcd-data-release.yml`：首次资源 ZIP 需要维护者上传到资源 Release（默认 tag 为 fcd-data）；后续发布 GitHub Release 或手动运行 workflow 时，从该资源 Release 下载、验证并附加同一个 ZIP。目标已有同名附件时保留，不覆盖。现有 PyPI workflow 不创建 GitHub Release，因此不会仅凭 tag 自动触发。
 - 12 项本地回归全部通过，workflow YAML/事件结构静态检查通过。此次未上传 GitHub 附件，未在远端执行 workflow；需先将代码合并到默认分支并上传首次资源附件。
+
+## 2026-10-28 Release 自动化与下载命令
+
+- Release workflow 支持 v* 标签推送、Release published、手动运行和 PyPI workflow 的可复用调用；不存在目标 Release 时按草稿、上传、发布的顺序执行，缺失源资源时不创建空 Release。同一目标标签串行处理。
+- 四项 GitHub CLI 本地模拟场景通过：新 Release 先上传再发布、已存在 Release 补挂附件、同名附件不覆盖、源附件缺失时安全失败。连同资源包测试共 8 项通过；未执行真实远端发布。
+- 根 README 和资源 README 均提供 PPMark0712/datatrove 最新 Release 的 Bash 与 PowerShell 下载/校验/解压命令。两段命令已在本机隔离 HTTP 服务上实际执行，四个解压文件内容均一致；这不代表尚未上传的远端资源附件已存在。
+- GitHub 只读查询确认当前无 Release。首次仍需上传 fcd-data 资源源 ZIP，再推送版本 tag 或通过发布 workflow 创建带附件的版本 Release。
