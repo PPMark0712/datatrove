@@ -106,7 +106,8 @@ def build_app():
                                 gr.Markdown("hard：在每个输入分片内，按 FCD 从高到低保留指定比例，文档数向下取整。")
                             workers = gr.Slider(1, 32, value=4, step=1, label="最大工作进程数")
                             config_feedback = gr.Markdown(config_hint(config_values()), elem_classes="config-feedback")
-                            gr.Markdown("重新运行会替换旧结果；继续运行沿用上次配置和已完成阶段。")
+                            gr.Markdown("继续运行沿用上次配置和已完成阶段；重新运行将替换旧结果。")
+                            rerun_ack = gr.Checkbox(label="我确认重新运行，替换此任务的旧结果", value=False, visible=False)
                             with gr.Row(elem_classes="run-actions"):
                                 start = gr.Button("开始处理", variant="primary")
                                 resume = gr.Button("继续运行")
@@ -169,7 +170,7 @@ def build_app():
             dataset_header, dataset_new_name,
             task_status, task_new_name, task_input_info, logs, result_summary, result_stats,
             download_file, score_plot, delete_dialog, save_dialog, task_tabs,
-            start, resume, stop, download, save, last_status, config_feedback, score_section, delete_job, score_type,
+            start, resume, stop, download, save, last_status, config_feedback, score_section, delete_job, score_type, rerun_ack,
         ] + config_inputs
         view_outputs += [dataset_preview.section] + dataset_preview.outputs
         view_outputs += [result_preview.section] + result_preview.outputs
@@ -206,6 +207,7 @@ def build_app():
                 gr.update(interactive=state.get("status") == "running"),
                 gr.update(interactive=done), gr.update(interactive=done and bool(output)), state,
                 config_hint(values), gr.update(visible=scored), gr.update(interactive=not busy), score_options(task),
+                gr.update(value=False, visible=bool(task) and state.get("status") != "created" and not busy),
             ] + [dict(control, value=value) for value, control in zip(values, controls)] + dataset_preview.reset() + result_preview.reset(bool(output))
 
         def show_view(event):
@@ -297,9 +299,11 @@ def build_app():
 
         show_view(confirm_delete.click(remove_task, [current_task, current_dataset], selection))
 
-        def start_task(tid, *values):
+        def start_task(tid, acknowledged, *values):
             if not tid:
                 raise gr.Error("请先选择任务")
+            if Task(tid).get_status().get("status") != "created" and not acknowledged:
+                raise gr.Error("请先勾选确认替换旧结果，或使用「继续运行」保留已完成阶段")
             config = make_config(*values)
             try:
                 run_pipeline_async(Task(tid), config, config["workers"])
@@ -307,7 +311,8 @@ def build_app():
                 raise gr.Error(str(exc)) from exc
             gr.Info("任务已启动，可在运行日志中查看进度")
 
-        show_view(start.click(start_task, [current_task] + config_inputs))
+        show_view(start.click(start_task, [current_task, rerun_ack] + config_inputs,
+                              concurrency_id="view-state"))
 
         def resume_task(tid, task_drafts):
             task = Task(tid)
@@ -326,7 +331,7 @@ def build_app():
                                concurrency_id="view-state"))
         show_view(stop.click(lambda tid: Task(tid).stop(), current_task))
         def poll(tid, previous, task_drafts, force=False):
-            unchanged = (gr.skip(),) * (18 + len(config_inputs))
+            unchanged = (gr.skip(),) * (19 + len(config_inputs))
             # Refresh the task list even when browsing a dataset, so jobs don't
             # appear stuck in "running" until they are selected again.
             choices = gr.update(choices=task_choices())
@@ -352,11 +357,13 @@ def build_app():
                 gr.update(selected="results") if done and previous and previous.get("status") in ("running", "stopping") else gr.skip(),
                 gr.update(choices=dataset_choices()), config_hint(values), gr.update(visible=scored),
                 gr.update(interactive=not busy), score_options(task) if state != previous else gr.skip(),
+                gr.update(value=False, visible=state.get("status") != "created" and not busy)
+                if state != previous else gr.skip(),
             ) + tuple(config_controls(values, busy))
 
         poll_outputs = [task_status, logs, tasks, result_summary, result_stats, result_preview.section,
                         start, resume, stop, download, save, last_status, task_tabs, datasets,
-                        config_feedback, score_section, delete_job, score_type] + config_inputs
+                        config_feedback, score_section, delete_job, score_type, rerun_ack] + config_inputs
         timer.tick(poll, [current_task, last_status, drafts], poll_outputs,
                    show_progress="hidden", concurrency_id="view-state")
         refresh_task.click(lambda tid, previous, saved: poll(tid, previous, saved, force=True),
@@ -397,7 +404,8 @@ def build_app():
             return result, "", "dataset"
 
         show_view(confirm_save.click(save_result, [current_task, save_name], selection))
-        plot.click(plot_scores, [current_task, score_type], score_plot)
+        score_type.input(lambda: None, outputs=score_plot, show_progress="hidden", concurrency_id="view-state")
+        plot.click(plot_scores, [current_task, score_type], score_plot, concurrency_id="view-state")
         app.load(fn=None, js="""() => {
             if (window.__datasetDialogKeys) return;
             window.__datasetDialogKeys = true;

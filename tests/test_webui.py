@@ -142,3 +142,30 @@ def test_stop_terminates_real_worker_and_child(task, tmp_path, monkeypatch):
         if child and child.is_running():
             child.kill()
         thread.join(10)
+
+def test_rerun_requires_explicit_confirmation(task, monkeypatch):
+    task.save_config({'steps': ['data_clean']})
+    task.set_status('completed')
+    launches = []
+    monkeypatch.setattr(webapp, 'run_pipeline_async', lambda *args: launches.append(args))
+    ui = webapp.build_app()
+    callbacks = {fn.fn.__name__: fn for fn in ui.fns.values() if fn.fn}
+    start = callbacks['start_task'].fn
+    with pytest.raises(Exception, match='确认替换旧结果'):
+        start(task.task_id, False, *handlers.config_values(task))
+    assert not launches
+    start(task.task_id, True, *handlers.config_values(task))
+    assert len(launches) == 1
+    render = callbacks['render']
+    rendered = render.fn('', task.task_id, 'task', {})
+    assert len(rendered) == len(render.outputs)
+    acknowledgment = next(value for component, value in zip(render.outputs, rendered)
+                          if getattr(component, 'label', '') == '我确认重新运行，替换此任务的旧结果')
+    assert acknowledgment['value'] is False
+    assert acknowledgment['visible'] is True
+    poll = callbacks['poll']
+    polled = poll.fn(task.task_id, {'status': 'running'}, {})
+    assert len(polled) == len(poll.outputs)
+    task.set_status('created')
+    start(task.task_id, False, *handlers.config_values(task))
+    assert len(launches) == 2

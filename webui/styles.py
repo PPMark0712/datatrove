@@ -159,4 +159,50 @@ footer { display: none !important; }
     #main-panel { height: auto; overflow: visible; }
     .empty-state { margin-top: 24px; }
 }
+
+/* Workbench surfaces and a consistent visual rhythm. */
+:root { --workbench-accent: #4f46e5; }
+.gradio-container { background: #f5f7fb !important; }
+.app-header { height: 72px; padding: 0 28px; box-shadow: 0 1px 8px #0f172a06; }
+.app-header strong { font-size: 19px; }
+.app-header small { font-size: 12px; letter-spacing: .5px; }
+#workspace { height: calc(100dvh - 72px); }
+#sidebar { background: #fff; padding: 0 16px 16px; }
+.sidebar-label { color: #64748b; padding: 20px 4px 12px; letter-spacing: 1px; }
+.item-list label { border-color: transparent !important; border-radius: 9px !important; padding: 10px 12px !important; }
+.item-list label:hover { background: #f5f7fb !important; }
+.item-list label:has(input:checked) { background: #eef2ff !important; border-color: #c7d2fe !important; color: #3730a3; }
+#main-panel { background: #f5f7fb; padding: 28px 32px 40px; }
+#main-panel > .column { max-width: 1280px; margin-inline: auto; }
+.task-tabs { border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; overflow: hidden; }
+.task-tabs > .tab-nav { padding: 6px 12px 0; border-bottom: 1px solid #e2e8f0; }
+.task-tabs > .tabitem { padding: 20px !important; }
+.name-actions { padding: 12px 0 16px; }
+.status-line { gap: 10px; }
+.badge { border-radius: 20px; padding: 5px 12px; font-weight: 600; }
+.config-feedback { border-radius: 0 8px 8px 0; padding: 10px 14px !important; }
+.empty-state { max-width: 680px; padding: 40px; border: 1px solid #e2e8f0; border-radius: 18px; background: #fff; box-shadow: 0 10px 32px #0f172a04; }
+.empty-state h2 { font-size: 28px !important; }
+button { transition: background-color .15s, border-color .15s, box-shadow .15s; }
+button:focus-visible { outline: 3px solid #a5b4fc !important; outline-offset: 3px; }
+.run-actions { border-top: 1px solid #e2e8f0; padding-top: 16px; margin-top: 4px; }
+@media (max-width: 1000px) {
+    #main-panel { padding: 20px; }
+    .app-header small { display: none; }
+}
+@media (max-width: 800px) {
+    .name-actions > div { flex: 1 1 100% !important; min-width: 0 !important; }
+    .name-actions > button { flex: 1 1 0 !important; }
+}
+@media (max-width: 560px) {
+    .app-header { height: 60px; padding: 0 16px; }
+    .app-header strong { font-size: 15px; }
+    #workspace { height: auto; }
+    #sidebar { min-width: 0 !important; height: 280px; border-bottom: 1px solid #e2e8f0; }
+    #main-panel { padding: 16px 12px 28px; }
+    .task-tabs > .tabitem { padding: 12px !important; }
+    .empty-state { padding: 24px; margin-top: 8px; }
+    .name-actions { gap: 8px !important; }
+    .name-actions > button { min-width: 88px !important; }
+}
 """
