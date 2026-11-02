@@ -69,6 +69,16 @@ def get_args():
     return args
 
 
+def gopher_quality_options(language: str) -> dict:
+    """Keep quality checks enabled, with word rules adapted to Chinese."""
+    if language == "zh":
+        return {
+            "min_avg_word_length": 1,
+            "stop_words": ["的", "了", "在", "是", "和", "有", "也", "与", "对"],
+        }
+    return {}
+
+
 def main():
     args = get_args()
     MAIN_OUTPUT_PATH = args.output_path
@@ -159,10 +169,7 @@ def main():
                 ),
                 GopherQualityFilter(
                     language=language,
-                    min_stop_words=None,
-                    max_non_alpha_words_ratio=None,
-                    min_avg_word_length=None,
-                    max_avg_word_length=None,
+                    **gopher_quality_options(language),
                     exclusion_writer=JsonlWriter(
                         os.path.join(QUALITY_FILTERING_REMOVE_PATH, "2_gopher_quality_filter"),
                         output_filename="${filter_reason}/${rank}.jsonl",
@@ -291,6 +298,7 @@ def main():
         minhash_filter_executor = LocalPipelineExecutor(
             pipeline=minhash_filter_pipeline,
             tasks=args.tasks,
+            workers=args.workers,
             logging_dir=os.path.join(LOG_PATH, "3_minhash_deduplication", language, "4_filter"),
             skip_completed=not args.rerun,
             depends=minhash_cluster_executor,
